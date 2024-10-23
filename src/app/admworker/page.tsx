@@ -191,7 +191,7 @@ export default function AdminTrabajadores() {
   }
 
   if (role === null) {
-    return <div>Loading...</div>
+    return <div>Cargando...</div>
   }
 
   if (role !== 'admin') {
@@ -250,108 +250,101 @@ export default function AdminTrabajadores() {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <ul className="space-y-4">
-                {filteredTrabajadores.map(trabajador => (
-                  <motion.li 
-                    key={trabajador.id} 
-                    className="p-4 border border-gray-200 rounded-lg flex justify-between items-center hover:shadow-md transition duration-300"
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <div>
-                      <p className="font-medium text-gray-800">{trabajador.name || "Nombre no disponible"}</p>
-                      <p className="text-gray-600">{trabajador.email || "Email no disponible"}</p>
-                      <p className="text-gray-500">{trabajador.role || "Rol no disponible"}</p>
+                {filteredTrabajadores.map((trabajador) => (
+                  <li key={trabajador.id} className="p-4 bg-gray-100 rounded-lg shadow-md flex justify-between items-center">
+                    <div className="flex-grow">
+                      <h2 className="text-lg font-bold">{trabajador.name}</h2>
+                      <p className="text-sm text-gray-600">{trabajador.email}</p>
+                      <p className="text-sm text-gray-500">Rol: {trabajador.role}</p>
                     </div>
-                    <div className="flex space-x-2">
-                      <motion.button
+                    <div className="flex items-center space-x-2">
+                      <motion.button 
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleEditClick(trabajador)}
-                        className="flex items-center bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded transition duration-300 shadow-md"
+                        className="text-blue-500 hover:text-blue-600 transition duration-300"
                       >
-                        <Edit2 className="mr-1" size={16} />
-                        Editar
+                        <Edit2 size={20} />
                       </motion.button>
-                      <motion.button
+                      <motion.button 
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleDelete(trabajador.id)}
-                        className="flex items-center bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded transition duration-300 shadow-md"
+                        className="text-red-500 hover:text-red-600 transition duration-300"
                       >
-                        <Trash2 className="mr-1" size={16} />
-                        Eliminar
+                        <Trash2 size={20} />
                       </motion.button>
                     </div>
-                  </motion.li>
+                  </li>
                 ))}
               </ul>
-
-              <AnimatePresence>
-                {editableTrabajador && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="mt-6 bg-white border border-gray-200 rounded-lg p-6 shadow-lg"
-                  >
-                    <h2 className="text-2xl font-semibold mb-4 text-gray-800">Editar Trabajador</h2>
-                    <form onSubmit={(e) => {
-                      e.preventDefault()
-                      if (editableTrabajador) handleUpdate(editableTrabajador)
-                    }}>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                        <input
-                          type="text"
-                          value={editableTrabajador.name || ""}
-                          onChange={(e) => setEditableTrabajador({ ...editableTrabajador, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300"
-                        />
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input
-                          type="email"
-                          value={editableTrabajador.email || ""}
-                          onChange={(e) => setEditableTrabajador({ ...editableTrabajador, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300"
-                        />
-                      </div>
-                      <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-                        <input
-                          type="text"
-                          value={editableTrabajador.role || ""}
-                          onChange={(e) => setEditableTrabajador({ ...editableTrabajador, role: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300"
-                        />
-                      </div>
-                      <div className="flex justify-end space-x-3">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          type="button"
-                          onClick={() => setEditableTrabajador(null)}
-                          className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition duration-300 shadow-md"
-                        >
-                          <X className="mr-1 inline" size={16} />
-                          Cancelar
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          type="submit"
-                          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition duration-300 shadow-md"
-                        >
-                          <Check className="mr-1 inline" size={16} />
-                          Guardar
-                        </motion.button>
-                      </div>
-                    </form>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
+
+            <AnimatePresence>
+              {editableTrabajador && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
+                  className="mt-8 bg-white p-6 rounded-lg shadow-md"
+                >
+                  <h3 className="text-lg font-bold mb-4">Editar Trabajador</h3>
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      if (editableTrabajador) {
+                        handleUpdate(editableTrabajador)
+                      }
+                    }}
+                    className="space-y-4"
+                  >
+                    <input
+                      type="text"
+                      value={editableTrabajador.name || ''}
+                      onChange={(e) => setEditableTrabajador({ ...editableTrabajador, name: e.target.value })}
+                      placeholder="Nombre"
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <input
+                      type="email"
+                      value={editableTrabajador.email || ''}
+                      onChange={(e) => setEditableTrabajador({ ...editableTrabajador, email: e.target.value })}
+                      placeholder="Correo Electrónico"
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <select
+                      value={editableTrabajador.role || ''}
+                      onChange={(e) => setEditableTrabajador({ ...editableTrabajador, role: e.target.value })}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="" disabled>Seleccionar Rol</option>
+                      <option value="admin">Admin</option>
+                      <option value="worker">Trabajador</option>
+                    </select>
+                    <div className="flex justify-end space-x-2">
+                      <motion.button
+                        type="button"
+                        onClick={() => setEditableTrabajador(null)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-gray-200 text-gray-800 p-2 rounded-lg"
+                      >
+                        <X size={20} />
+                      </motion.button>
+                      <motion.button
+                        type="submit"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                      >
+                        <Check size={20} />
+                      </motion.button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       </div>
