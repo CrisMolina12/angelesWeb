@@ -151,7 +151,7 @@ export default function AdminDashboard() {
         setPassword('')
         setName('')
       } else {
-        throw new Error('No se pudo crear el usuario.')
+        throw new Error('No se pudo crear el  usuario.')
       }
     } catch (error) {
       console.error('Error:', error.message)

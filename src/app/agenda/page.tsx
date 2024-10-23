@@ -85,7 +85,7 @@ export default function CalendarioCitas() {
       }
 
       if (citas) {
-        const eventosFormateados = citas.map((cita: any) => ({
+        const eventosFormateados = citas.map((cita: { id: number; description: string; service_date: string; start_time: string; end_time: string; ventas?: { id: number; client_id: string } }) => ({
           title: cita.description || 'Sin título',
           start: moment(`${cita.service_date} ${cita.start_time}`).toDate(),
           end: moment(`${cita.service_date} ${cita.end_time}`).toDate(),
@@ -224,7 +224,7 @@ export default function CalendarioCitas() {
               <div className={`text-right ${isCurrentMonth ? 'text-gray-700' : 'text-gray-400'} ${isToday ? 'font-bold' : ''}`}>
                 {date.format('D')}
               </div>
-              {dayEvents.slice(0, 3).map((event, index) => (
+              {dayEvents.slice(0, 3).map((event) => (
                 <div
                   key={event.id}
                   onClick={() => handleSelectEvent(event)}
@@ -361,7 +361,7 @@ export default function CalendarioCitas() {
                   placeholder="Buscar citas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-300 text-lg shadow-sm"
+                  className="w-full pl-12  pr-4 py-3 border-2 border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-300 text-lg shadow-sm"
                 />
                 <Search className="absolute left-4 top-3.5 text-gray-400" size={24} />
               </div>

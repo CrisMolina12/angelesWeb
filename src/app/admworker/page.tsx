@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react"
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from "framer-motion"
-import { Edit2, Trash2, X, Check, Search, Filter, Bell, Menu, LogOut, UserPlus } from 'lucide-react'
+import { Edit2, Trash2, X, Check, Search, Filter, Bell, Menu, LogOut } from 'lucide-react'
 import Image from 'next/image'
 
 interface Trabajador {
@@ -56,7 +56,6 @@ function Header() {
 export default function AdminTrabajadores() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedTrabajador, setSelectedTrabajador] = useState<Trabajador | null>(null)
   const [editableTrabajador, setEditableTrabajador] = useState<Trabajador | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filteredTrabajadores, setFilteredTrabajadores] = useState<Trabajador[]>([])
@@ -112,9 +111,6 @@ export default function AdminTrabajadores() {
     }
 
     fetchUserRole()
-  }, [])
-
-  useEffect(() => {
     fetchTrabajadores()
   }, [fetchTrabajadores])
 
@@ -126,14 +122,8 @@ export default function AdminTrabajadores() {
     setFilteredTrabajadores(filtered)
   }, [searchTerm, trabajadores])
 
-  const handleSelectTrabajador = (trabajador: Trabajador) => {
-    setSelectedTrabajador(trabajador)
-    setEditableTrabajador(null)
-  }
-
   const handleEditClick = (trabajador: Trabajador) => {
     setEditableTrabajador(trabajador)
-    setSelectedTrabajador(null)
   }
 
   const handleDelete = async (id: number) => {
@@ -148,7 +138,6 @@ export default function AdminTrabajadores() {
       }
 
       await fetchTrabajadores()
-      setSelectedTrabajador(null)
     } catch (error) {
       console.error("Error al eliminar el trabajador:", error)
       setError("Error al eliminar el trabajador. Por favor, intente de nuevo.")
