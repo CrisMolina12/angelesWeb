@@ -1,8 +1,9 @@
-"use client"; // Hace que el contexto sea un Client Component
+// src/components/AuthProvider.tsx
+'use client';
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import supabase from '../../../lib/supabaseClient';
+import supabase from '../lib/supabaseClient';
 
 interface AuthContextType {
   workerId: string | null;
@@ -11,7 +12,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const router = useRouter();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +32,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const handleLogout = async () => {
       try {
-        // Intenta cerrar sesión
         const { error } = await supabase.auth.signOut();
 
         if (error) {
@@ -39,7 +39,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        // Redirige a la página de inicio de sesión después de cerrar sesión
         router.push('/login');
       } catch (error) {
         console.error("Error inesperado al cerrar la sesión:", error);
@@ -47,31 +46,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const handleActivity = () => {
-      resetTimeout(); // Restablece el contador de inactividad en cada actividad
+      resetTimeout();
     };
 
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-      if (!session) {
-        router.push('/login'); // Redirige si no hay sesión
-      } else {
-        setWorkerId(session.user.id);
-        setIsLoading(false);
-        resetTimeout(); // Inicia el contador de inactividad al cargar la página
+        if (error) {
+          console.error("Error al obtener la sesión:", error.message);
+          return;
+        }
+
+        if (!session) {
+          router.push('/login');
+        } else {
+          setWorkerId(session.user.id);
+          setIsLoading(false);
+          resetTimeout();
+        }
+      } catch (err) {
+        console.error("Error inesperado al verificar la sesión:", err);
       }
     };
 
     checkSession();
 
-    // Eventos para detectar actividad del usuario
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('keydown', handleActivity);
 
     return () => {
-      // Limpia los eventos y el timeout al desmontar el componente
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
       if (timeoutRef.current) {
@@ -90,7 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth debe ser utilizado dentro de un AuthProvider');
   }
   return context;
 };

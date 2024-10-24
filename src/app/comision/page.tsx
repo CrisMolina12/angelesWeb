@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect } from 'react'
 import supabase from "../../../lib/supabaseClient"
 import { motion } from 'framer-motion'
 import { Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
@@ -25,8 +24,7 @@ type Comision = {
   abonos: Abono[]
 }
 
-export default function ComisionesTable() {
-  const router = useRouter()
+export default function Component() {
   const [comisiones, setComisiones] = useState<Comision[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedRows, setExpandedRows] = useState<number[]>([])
@@ -37,7 +35,7 @@ export default function ComisionesTable() {
 
   const fetchComisiones = async () => {
     try {
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('comision')
         .select(`
           *,
@@ -54,7 +52,7 @@ export default function ComisionesTable() {
       if (error) throw error
 
       if (data) {
-        const comisionesFormateadas = data.map((comision: any) => ({
+        const comisionesFormateadas = data.map((comision) => ({
           id_comision: comision.id_comision,
           ventas_id_venta: comision.ventas_id_venta,
           empleado_id_empleado: comision.empleado_id_empleado,
@@ -137,8 +135,8 @@ export default function ComisionesTable() {
           </thead>
           <tbody>
             {comisiones.map((comision) => (
-              <>
-                <tr key={comision.id_comision} className="border-b hover:bg-gray-100">
+              <React.Fragment key={comision.id_comision}>
+                <tr className="border-b hover:bg-gray-100">
                   <td className="py-3 px-4">
                     <button onClick={() => toggleRowExpansion(comision.id_comision)}>
                       {expandedRows.includes(comision.id_comision) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -194,7 +192,7 @@ export default function ComisionesTable() {
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>

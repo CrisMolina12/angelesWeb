@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Calendar, DollarSign, ShoppingBag, UserPlus, BarChart2, FileText, Settings, LogOut, Bell, Menu } from 'lucide-react'
+import { Users, Calendar, DollarSign,  UserPlus, BarChart2, FileText,  LogOut, Bell, Menu } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import supabase from '../../../lib/supabaseClient'
 
 function Header() {

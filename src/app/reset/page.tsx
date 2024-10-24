@@ -72,9 +72,11 @@ export default function ResetPassword() {
       setTimeout(() => {
         router.push('/login'); // Redirige al usuario a la página de inicio de sesión después de 2 segundos
       }, 2000);
-    } catch (err: any) {
-      console.error('Error al restablecer la contraseña:', err);
-      setError(err.message);
+    } catch (err) {
+      // Especifica el tipo de error y maneja el mensaje
+      const errorMessage = (err as Error).message || 'Error desconocido';
+      console.error('Error al restablecer la contraseña:', errorMessage);
+      setError(errorMessage);
     }
   };
 

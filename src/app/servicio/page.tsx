@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, } from 'framer-motion'
 import Image from 'next/image'
 import supabase from '../../../lib/supabaseClient'
-import { Plus, Search, Edit, X, Check, ToggleLeft, ToggleRight, Bell, Menu } from 'lucide-react'
+import { Plus,  Edit, X, Check, ToggleLeft, ToggleRight, Bell, Menu } from 'lucide-react'
 
 interface Servicio {
   id: number
@@ -91,10 +91,9 @@ export default function ServicioManagement() {
   const handleAddServicio = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('servicios')
         .insert([{ ...newServicio }])
-        .select()
 
       if (error) throw error
       await fetchServicios()
@@ -107,7 +106,7 @@ export default function ServicioManagement() {
 
   const handleEditServicio = async (servicio: Servicio) => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('servicios')
         .update({
           name_servicio: servicio.name_servicio,
@@ -115,7 +114,6 @@ export default function ServicioManagement() {
           estado_servicio_id: servicio.estado_servicio_id,
         })
         .eq('id', servicio.id)
-        .select()
 
       if (error) throw error
       await fetchServicios()
@@ -138,11 +136,10 @@ export default function ServicioManagement() {
 
       if (estadoError) throw estadoError
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('servicios')
         .update({ estado_servicio_id: estadoData.id })
         .eq('id', servicio.id)
-        .select()
 
       if (error) throw error
       await fetchServicios()
@@ -328,7 +325,7 @@ export default function ServicioManagement() {
                                   setEditingId(servicio.id)
                                   setEditingServicio(servicio)
                                 }}
-                                className="text-purple-600 hover:text-purple-900 mr-4"
+                                className="text-purple-600  hover:text-purple-900 mr-4"
                               >
                                 <Edit className="h-5 w-5" />
                               </motion.button>

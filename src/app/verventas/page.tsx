@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import supabase from "../../../lib/supabaseClient"
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Menu, LogOut, Search, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Calendar, X, Check } from 'lucide-react'
+import { Bell, Menu, LogOut, Search, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 
 type Venta = {
   id: number
@@ -26,6 +26,11 @@ type NewAppointment = {
   start_time: string
   end_time: string
   description: string
+}
+
+type Cita = {
+  service_date: string
+  start_time: string
 }
 
 export default function VentasActivas() {
@@ -66,10 +71,10 @@ export default function VentasActivas() {
       console.error('Error fetching ventas:', error)
     } else if (data) {
       const ventasFormateadas = data.map(venta => {
-        const futureCitas = venta.citas.filter((cita: any) => {
+        const futureCitas = (venta.citas as Cita[]).filter((cita) => {
           const citaDateTime = new Date(`${cita.service_date}T${cita.start_time}`)
           return citaDateTime > new Date()
-        }).sort((a: any, b: any) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
+        }).sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
 
         return {
           ...venta,
@@ -83,24 +88,6 @@ export default function VentasActivas() {
       setVentas(ventasFormateadas)
     }
     setLoading(false)
-  }
-
-  const ventasFiltradas = ventas.filter(venta =>
-    venta.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.worker_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.service_name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const ventasActivas = ventasFiltradas.filter(venta => venta.is_active)
-  const ventasInactivas = ventasFiltradas.filter(venta => !venta.is_active)
-
-  const indexOfLastVenta = currentPage * ventasPorPagina
-  const indexOfFirstVenta = indexOfLastVenta - ventasPorPagina
-  const ventasActuales = ventasFiltradas.slice(indexOfFirstVenta, indexOfLastVenta)
-
-  const pageNumbers = []
-  for (let i = 1; i <= Math.ceil(ventasFiltradas.length / ventasPorPagina); i++) {
-    pageNumbers.push(i)
   }
 
   const handleEditVenta = (venta: Venta) => {
@@ -186,16 +173,21 @@ export default function VentasActivas() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-50">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full"
-        />
-      </div>
-    )
+  const ventasFiltradas = ventas.filter(venta =>
+    venta.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    venta.worker_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    venta.service_name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const ventasActivas = ventasFiltradas.filter(venta => venta.is_active)
+  const ventasInactivas = ventasFiltradas.filter(venta => !venta.is_active)
+
+  const indexOfLastVenta = currentPage * ventasPorPagina
+  const indexOfFirstVenta = indexOfLastVenta - ventasPorPagina
+
+  const pageNumbers = []
+  for (let i = 1; i <= Math.ceil((ventasActivas.length + ventasInactivas.length) / ventasPorPagina); i++) {
+    pageNumbers.push(i)
   }
 
   const renderVentasTable = (ventas: Venta[], title: string) => (
@@ -250,6 +242,18 @@ export default function VentasActivas() {
       </div>
     </div>
   )
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full"
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -311,18 +315,18 @@ export default function VentasActivas() {
               </div>
             </div>
 
-            {renderVentasTable(ventasActivas, "Ventas Activas")}
-            {renderVentasTable(ventasInactivas, "Ventas Inactivas")}
+            {renderVentasTable(ventasActivas.slice(indexOfFirstVenta, indexOfLastVenta), "Ventas Activas")}
+            {renderVentasTable(ventasInactivas.slice(indexOfFirstVenta, indexOfLastVenta), "Ventas Inactivas")}
 
             <div className="mt-6 flex justify-between items-center">
               <div>
                 <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{indexOfFirstVenta + 1}</span> a <span className="font-medium">{Math.min(indexOfLastVenta, ventasFiltradas.length)}</span> de <span className="font-medium">{ventasFiltradas.length}</span> resultados
+                  Mostrando <span className="font-medium">{indexOfFirstVenta + 1}</span> a <span className="font-medium">{Math.min(indexOfLastVenta, ventasActivas.length + ventasInactivas.length)}</span> de <span className="font-medium">{ventasActivas.length + ventasInactivas.length}</span> resultados
                 </p>
               </div>
               <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
-                  onClick={()=> setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  onClick={()=> setCurrentPage(prev =>   Math.max(prev - 1, 1))}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
                   <span className="sr-only">Previous</span>

@@ -6,6 +6,7 @@ import supabase from '../../../lib/supabaseClient'
 import { motion } from 'framer-motion'
 import { DollarSign, TrendingUp, Users, Calendar } from 'lucide-react'
 import Image from 'next/image'
+
 function Header() {
   return (
     <header className="bg-purple-600 p-4 rounded-2xl shadow-lg mb-8 mx-auto max-w-7xl">
@@ -29,6 +30,7 @@ function Header() {
     </header>
   )
 }
+
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend)
 
 type Venta = {
@@ -221,118 +223,96 @@ export default function InformesNegocio() {
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <Header />
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-extrabold text-gray-900 mb-10 text-center">Informes de Negocio</h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white overflow-hidden shadow-lg rounded-xl"
-          >
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-blue-600 rounded-md p-3">
-                  <DollarSign className="h-8 w-8 text-white" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Ventas Totales</dt>
-                    <dd>
-                      <div className="text-lg font-bold text-gray-900">${ventasTotales}</div>
-                    </dd>
-                  </dl>
-                </div>
+        <h1 className="text-4xl font-extrabold text-gray-900 mb-8">Informes de Negocio</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-green-600 rounded-md p-3">
+                <DollarSign className="h-8 w-8 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Ventas</dt>
+                  <dd>
+                    <div className="text-lg font-bold text-gray-900">${ventasTotales.toFixed(2)}</div>
+                  </dd>
+                </dl>
               </div>
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white overflow-hidden shadow-lg rounded-xl"
-          >
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-600 rounded-md p-3">
-                  <TrendingUp className="h-8 w-8 text-white" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Valor Promedio de Venta</dt>
-                    <dd>
-                      <div className="text-lg font-bold text-gray-900">${valorPromedioVenta.toFixed(2)}</div>
-                    </dd>
-                  </dl>
-                </div>
+          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-yellow-600 rounded-md p-3">
+                <TrendingUp className="h-8 w-8 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Valor Promedio Venta</dt>
+                  <dd>
+                    <div className="text-lg font-bold text-gray-900">${valorPromedioVenta.toFixed(2)}</div>
+                  </dd>
+                </dl>
               </div>
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white overflow-hidden shadow-lg rounded-xl"
-          >
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                  <Users className="h-8 w-8 text-white" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Trabajadores Registrados</dt>
-                    <dd>
-                      <div className="text-lg font-bold text-gray-900">{trabajadores.length}</div>
-                    </dd>
-                  </dl>
-                </div>
+          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-blue-600 rounded-md p-3">
+                <Users className="h-8 w-8 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Trabajadores Activos</dt>
+                  <dd>
+                    <div className="text-lg font-bold text-gray-900">{trabajadores.length}</div>
+                  </dd>
+                </dl>
               </div>
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white overflow-hidden shadow-lg rounded-xl"
-          >
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-purple-600 rounded-md p-3">
-                  <Calendar className="h-8 w-8 text-white" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Citas Registradas</dt>
-                    <dd>
-                      <div className="text-lg font-bold text-gray-900">{citasFiltradas.length}</div>
-                    </dd>
-                  </dl>
-                </div>
+          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-purple-600 rounded-md p-3">
+                <Calendar className="h-8 w-8 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Citas Registradas</dt>
+                  <dd>
+                    <div className="text-lg font-bold text-gray-900">{citas.length}</div>
+                  </dd>
+                </dl>
               </div>
             </div>
           </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-8">
           <div className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Ventas Mensuales</h2>
+            <h2 className="text-xl font-semibold mb-4">Ventas Mensuales</h2>
             <Bar data={datosGraficoBarras} options={{ responsive: true }} />
           </div>
 
           <div className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Ventas Diarias</h2>
+            <h2 className="text-xl font-semibold mb-4">Ventas Diarias</h2>
             <Line data={datosGraficoLineas} options={{ responsive: true }} />
           </div>
-
-          <div className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Ventas por Trabajador</h2>
-            <Pie data={datosGraficoCircular} options={{ responsive: true }} />
-          </div>
         </div>
+
+        <div className="bg-white shadow-lg rounded-xl p-6 mt-8">
+          <h2 className="text-xl font-semibold mb-4">Distribución de Ventas por Trabajador</h2>
+          <Pie data={datosGraficoCircular} options={{ responsive: true }} />
+        </div>
+
+        {debugInfo && (
+          <pre className="mt-8 p-4 bg-gray-200 rounded-md">
+            <h3 className="font-bold">Información de Depuración:</h3>
+            <code>{debugInfo}</code>
+          </pre>
+        )}
       </div>
     </div>
   )

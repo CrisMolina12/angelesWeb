@@ -4,9 +4,9 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import supabase from "../../../lib/supabaseClient"
-import { Edit2, Trash2, Search, X, Save, Plus, Bell, Menu, LogOut } from "lucide-react"
+import { Edit2, Trash2, Search, Plus, Bell, Menu, LogOut } from "lucide-react"
 import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 interface Cliente {
   id: string
@@ -60,7 +60,6 @@ const GestionClientes = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [editedCliente, setEditedCliente] = useState<Cliente | null>(null)
-  const [user, setUser] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -87,30 +86,28 @@ const GestionClientes = () => {
     }
   }
 
-  const checkUser = async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession()
-
-      if (error) {
-        throw error
-      }
-
-      if (!session) {
-        router.push("/login")
-      } else {
-        setUser(session.user)
-      }
-    } catch (error) {
-      console.error("Error al obtener la sesión del usuario:", error)
-      setError("Error de autenticación. Por favor, inicie sesión de nuevo.")
-      router.push("/login")
-    }
-  }
-
   useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+
+        if (error) {
+          throw error
+        }
+
+        if (!session) {
+          router.push("/login")
+        }
+      } catch (error) {
+        console.error("Error al obtener la sesión del usuario:", error)
+        setError("Error de autenticación. Por favor, inicie sesión de nuevo.")
+        router.push("/login")
+      }
+    }
+
     checkUser()
     fetchClientes()
-  }, [])
+  }, [router]) // Solo dependemos de router
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value)
@@ -143,7 +140,7 @@ const GestionClientes = () => {
   }
 
   const handleUpdate = async () => {
-    if (!editedCliente) return
+    if (!editedCliente) return;
 
     try {
       const { error } = await supabase
@@ -151,19 +148,19 @@ const GestionClientes = () => {
         .update({
           name: editedCliente.name,
           phone: editedCliente.phone,
-          rut: editedCliente.rut,
+          rut: editedCliente.rut
         })
-        .eq("id", editedCliente.id)
+        .eq("id", editedCliente.id);
 
       if (error) {
-        throw error
+        throw error;
       }
 
-      setEditedCliente(null)
-      await fetchClientes()
+      setEditedCliente(null); // Limpiar el estado después de la actualización
+      await fetchClientes(); // Refrescar la lista de clientes
     } catch (error) {
-      console.error("Error al actualizar el cliente:", error)
-      setError("Error al actualizar el cliente. Por favor, intente de nuevo.")
+      console.error("Error al actualizar el cliente:", error);
+      setError("Error al actualizar el cliente. Por favor, intente de nuevo.");
     }
   }
 
@@ -232,38 +229,33 @@ const GestionClientes = () => {
                       <th className="px-4 py-3 text-left">Nombre</th>
                       <th className="px-4 py-3 text-left">Teléfono</th>
                       <th className="px-4 py-3 text-left">RUT</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
+                      <th className="px-4 py-3 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredClientes.map((cliente) => (
-                      <motion.tr 
-                        key={cliente.id} 
-                        className="border-b hover:bg-gray-50 transition duration-150 ease-in-out"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                      <motion.tr
+                        key={cliente.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         transition={{ duration: 0.3 }}
                       >
-                        <td className="px-4 py-3">{cliente.name}</td>
-                        <td className="px-4 py-3">{cliente.phone}</td>
-                        <td className="px-4 py-3">{cliente.rut}</td>
-                        <td className="px-4 py-3 text-right">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                        <td className="border px-4 py-2">{cliente.name}</td>
+                        <td className="border px-4 py-2">{cliente.phone}</td>
+                        <td className="border px-4 py-2">{cliente.rut}</td>
+                        <td className="border px-4 py-2 text-center">
+                          <button
                             onClick={() => handleEdit(cliente)}
-                            className="text-yellow-500 hover:text-yellow-700 mx-2 transition-colors"
+                            className="text-blue-600 hover:text-blue-800 transition duration-200 mr-4"
                           >
                             <Edit2 size={20} />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                          </button>
+                          <button
                             onClick={() => handleDelete(cliente.id)}
-                            className="text-red-500 hover:text-red-700 mx-2 transition-colors"
+                            className="text-red-600 hover:text-red-800 transition duration-200"
                           >
                             <Trash2 size={20} />
-                          </motion.button>
+                          </button>
                         </td>
                       </motion.tr>
                     ))}
@@ -272,78 +264,45 @@ const GestionClientes = () => {
               </div>
             )}
 
-            <AnimatePresence>
-              {editedCliente && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            {/* Formulario de edición */}
+            {editedCliente && (
+              <div className="mt-8 p-6 bg-gray-100 rounded-lg">
+                <h2 className="text-2xl font-bold mb-4">Editar Cliente</h2>
+                <input
+                  type="text"
+                  placeholder="Nombre"
+                  value={editedCliente.name}
+                  onChange={(e) => setEditedCliente({ ...editedCliente, name: e.target.value })}
+                  className="mb-4 p-2 border rounded"
+                />
+                <input
+                  type="text"
+                  placeholder="Teléfono"
+                  value={editedCliente.phone}
+                  onChange={(e) => setEditedCliente({ ...editedCliente, phone: e.target.value })}
+                  className="mb-4 p-2 border rounded"
+                />
+                <input
+                  type="text"
+                  placeholder="RUT"
+                  value={editedCliente.rut}
+                  onChange={(e) => setEditedCliente({ ...editedCliente, rut: e.target.value })}
+                  className="mb-4 p-2 border rounded"
+                />
+                <button 
+                  onClick={handleUpdate}
+                  className="bg-blue-500 text-white px-4 py-2 rounded"
                 >
-                  <motion.div
-                    initial={{ scale: 0.9, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.9, y: 20 }}
-                    className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"
-                  >
-                    <h2 className="text-2xl font-bold mb-6 text-gray-900">Editar Cliente</h2>
-                    <div className="mb-4">
-                      <label className="block mb-1 font-semibold text-gray-700">Nombre:</label>
-                      <input
-                        type="text"
-                        value={editedCliente.name}
-                        onChange={(e) =>
-                          setEditedCliente({ ...editedCliente, name: e.target.value })
-                        }
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 transition duration-300"
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <label className="block mb-1 font-semibold text-gray-700">Teléfono:</label>
-                      <input
-                        type="text"
-                        value={editedCliente.phone}
-                        onChange={(e) =>
-                          setEditedCliente({ ...editedCliente, phone: e.target.value })
-                        }
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 transition duration-300"
-                      />
-                    </div>
-                    <div className="mb-6">
-                      <label className="block mb-1 font-semibold text-gray-700">RUT:</label>
-                      <input
-                        type="text"
-                        value={editedCliente.rut}
-                        onChange={(e) =>
-                          setEditedCliente({ ...editedCliente, rut: e.target.value })
-                        }
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 transition duration-300"
-                      />
-                    </div>
-                    <div className="flex space-x-3">
-                      <motion.button
-                        whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(167, 139, 250, 0.5)" }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleUpdate}
-                        className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2 px-4 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 flex items-center justify-center flex-grow"
-                      >
-                        <Save size={18} className="mr-2" />
-                        Guardar
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setEditedCliente(null)}
-                        className="bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition duration-300 flex items-center justify-center flex-grow"
-                      >
-                        <X size={18} className="mr-2" />
-                        Cancelar
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  Guardar Cambios
+                </button>
+                <button 
+                  onClick={() => setEditedCliente(null)}
+                  className="ml-2 bg-gray-400 text-white px-4 py-2 rounded"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

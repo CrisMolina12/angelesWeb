@@ -1,13 +1,11 @@
 "use client"; // Asegura que este componente sea tratado como un Client Component
 
 import { useEffect } from "react";
-import type { Metadata } from "next";
-import { getMetadata } from "./metadata";  // Ajusta la ruta si es necesario
 import localFont from "next/font/local";
 import "./globals.css";
 import { useRouter } from "next/navigation";
 import supabase from '../../lib/supabaseClient'; // Asegúrate de que la ruta de importación de supabase sea correcta
-import InteractiveMenu from '../../components/menu';
+
 // Carga de fuentes locales con configuración específica de peso y variable CSS
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -20,8 +18,6 @@ const geistMono = localFont({
   variable: "--font-geist-mono",
   weight: "100 900",
 });
-
-const metadata: Metadata = getMetadata("Página de Ventas");
 
 // Tiempo de inactividad en milisegundos (ej. 5 minutos = 300000 ms)
 const INACTIVITY_TIMEOUT = 300000;

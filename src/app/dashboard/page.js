@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '../../../lib/supabaseClient'
-import { UserPlus, Users, LogOut, Bell, Menu } from 'lucide-react'
+import { LogOut, Bell, Menu } from 'lucide-react'
 import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 function Header() {
   return (
@@ -56,32 +56,32 @@ export default function AdminDashboard() {
 
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-  const fetchUserRole = async () => {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user || !user.email) {
-      router.push('/login')
-      return
-    }
-
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('email', user.email)
-      .single()
-
-    if (userError || !userData) {
-      router.push('/login')
-      return
-    }
-
-    setUserRole(userData.role)
-    setLoading(false)
-  }
-
   useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user || !user.email) {
+        router.push('/login')
+        return
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('email', user.email)
+        .single()
+
+      if (userError || !userData) {
+        router.push('/login')
+        return
+      }
+
+      setUserRole(userData.role)
+      setLoading(false)
+    }
+
     fetchUserRole()
-  }, [])
+  }, [router])
 
   if (loading) {
     return (
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
         setPassword('')
         setName('')
       } else {
-        throw new Error('No se pudo crear el  usuario.')
+        throw new Error('No se pudo crear el usuario.')
       }
     } catch (error) {
       console.error('Error:', error.message)
@@ -222,35 +222,25 @@ export default function AdminDashboard() {
                 <label className="absolute left-0 -top-3.5 text-gray-600 text-sm peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-440 peer-placeholder-shown:top-3 transition-all peer-focus:-top-3.5 peer-focus:text-gray-600 peer-focus:text-sm">Contraseña</label>
               </div>
               <div className="relative">
-                <label className="block mb-2 text-gray-700">Rol del usuario</label>
+                <label className="block mb-2 text-sm text-gray-600">Rol:</label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full border-b-2 border-gray-300 text-gray-900 h-12 px-3 focus:outline-none focus:border-purple-600"
-                  required
+                  className="h-12 w-full border-b-2 border-gray-300 text-gray-900 focus:outline-none focus:border-purple-600"
                 >
                   <option value="worker">Trabajador</option>
-                  <option value="admin">Administrador</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <UserPlus className="h-5 w-5 mr-2" />
-                Crear Usuario
-              </motion.button>
               {successMessage && (
-                <motion.p
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-green-500 text-center"
-                >
-                  {successMessage}
-                </motion.p>
+                <div className="text-green-600">{successMessage}</div>
               )}
+              <button
+                type="submit"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 rounded-lg transition-colors duration-200"
+              >
+                Crear Usuario
+              </button>
             </form>
           </div>
         </motion.div>
