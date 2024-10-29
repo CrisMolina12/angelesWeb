@@ -1,43 +1,53 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+
+import React, { useState, useEffect, useMemo } from 'react'
 import { Bar, Line, Pie } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
 import supabase from '../../../lib/supabaseClient'
 import { motion } from 'framer-motion'
-import { DollarSign, TrendingUp, Users, Calendar } from 'lucide-react'
+import { DollarSign, TrendingUp, Users,  CreditCard, Home } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend)
 
 function Header() {
   return (
-    <header className="bg-purple-600 p-4 rounded-2xl shadow-lg mb-8 mx-auto max-w-7xl">
+    <header className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-lg shadow-md mb-6 mx-auto max-w-7xl">
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-3">
           <div className="bg-white rounded-full p-1">
             <Image
               src="/Imagen1.png" 
               alt="Angeles Logo"
-              width={40}
-              height={40}
+              width={32}
+              height={32}
               className="rounded-full"
             />
           </div>
-          <h1 className="text-2xl font-bold text-white">Angeles</h1>
+          <h1 className="text-xl font-bold text-white">Angeles - Informes de Negocio</h1>
         </div>
-        <button className="text-white">
-          <Calendar size={24} />
-        </button>
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors">
+            <Home size={24} />
+            <span className="sr-only">Volver a la página principal</span>
+          </Link>
       </div>
     </header>
   )
 }
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend)
 
 type Venta = {
   id: number
   price: number
   worker_id: string | null
   worker_id_integer: number | null
+}
+
+type Abono = {
+  id: number
+  ventas_id_venta: number
+  cantidad_abonada: number
+  fecha_abono: string
 }
 
 type Cita = {
@@ -53,42 +63,41 @@ type Trabajador = {
 
 export default function InformesNegocio() {
   const [ventas, setVentas] = useState<Venta[]>([])
+  const [abonos, setAbonos] = useState<Abono[]>([])
   const [citas, setCitas] = useState<Cita[]>([])
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<string>('')
 
   useEffect(() => {
     const obtenerDatos = async () => {
       try {
-        // Obtener ventas
         const { data: datosVentas, error: errorVentas } = await supabase
           .from('ventas')
           .select('*')
           .order('id', { ascending: true })
-
         if (errorVentas) throw errorVentas
 
-        // Obtener citas
+        const { data: datosAbonos, error: errorAbonos } = await supabase
+          .from('abono')
+          .select('*')
+          .order('fecha_abono', { ascending: true })
+        if (errorAbonos) throw errorAbonos
+
         const { data: datosCitas, error: errorCitas } = await supabase
           .from('citas')
           .select('*')
-
         if (errorCitas) throw errorCitas
 
-        // Obtener trabajadores
         const { data: datosTrabajadores, error: errorTrabajadores } = await supabase
           .from('users')
           .select('id, name')
-
         if (errorTrabajadores) throw errorTrabajadores
 
         setVentas(datosVentas)
+        setAbonos(datosAbonos)
         setCitas(datosCitas)
         setTrabajadores(datosTrabajadores)
-
-        setDebugInfo(`Ventas: ${JSON.stringify(datosVentas)}\nCitas: ${JSON.stringify(datosCitas)}\nTrabajadores: ${JSON.stringify(datosTrabajadores)}`)
       } catch (err) {
         setError('Error al obtener los datos. Por favor, inténtelo de nuevo más tarde.')
         console.error(err)
@@ -104,19 +113,29 @@ export default function InformesNegocio() {
   const citasFiltradas = useMemo(() => citas.filter(cita => ventas.find(venta => venta.id === cita.venta_id)), [ventas, citas])
   
   const ventasTotales = useMemo(() => ventasFiltradas.reduce((sum, venta) => sum + venta.price, 0), [ventasFiltradas])
+  const abonosTotales = useMemo(() => abonos.reduce((sum, abono) => sum + abono.cantidad_abonada, 0), [abonos])
   const valorPromedioVenta = useMemo(() => ventasFiltradas.length > 0 ? ventasTotales / ventasFiltradas.length : 0, [ventasFiltradas, ventasTotales])
+  const porcentajeAbonado = useMemo(() => ventasTotales > 0 ? (abonosTotales / ventasTotales) * 100 : 0, [abonosTotales, ventasTotales])
 
-  const ventasMensuales = useMemo(() => {
-    return citasFiltradas.reduce((acc, cita) => {
-      const venta = ventas.find(venta => venta.id === cita.venta_id)
+  const ventasYAbonosMensuales = useMemo(() => {
+    const datos: Record<string, { ventas: number, abonos: number }> = {}
+    citasFiltradas.forEach(cita => {
+      const venta = ventas.find(v => v.id === cita.venta_id)
       if (venta) {
         const fecha = new Date(cita.service_date)
         const mesAno = `${fecha.getMonth() + 1}/${fecha.getFullYear()}`
-        acc[mesAno] = (acc[mesAno] || 0) + venta.price
+        if (!datos[mesAno]) datos[mesAno] = { ventas: 0, abonos: 0 }
+        datos[mesAno].ventas += venta.price
       }
-      return acc
-    }, {} as Record<string, number>)
-  }, [ventas, citasFiltradas])
+    })
+    abonos.forEach(abono => {
+      const fecha = new Date(abono.fecha_abono)
+      const mesAno = `${fecha.getMonth() + 1}/${fecha.getFullYear()}`
+      if (!datos[mesAno]) datos[mesAno] = { ventas: 0, abonos: 0 }
+      datos[mesAno].abonos += abono.cantidad_abonada
+    })
+    return datos
+  }, [ventas, abonos, citasFiltradas])
 
   const ventasPorTrabajador = useMemo(() => {
     return ventasFiltradas.reduce((acc, venta) => {
@@ -129,33 +148,37 @@ export default function InformesNegocio() {
   const trabajadoresMap = useMemo(() => new Map(trabajadores.map(t => [t.id.toString(), t.name])), [trabajadores])
 
   const datosGraficoBarras = useMemo(() => ({
-    labels: Object.keys(ventasMensuales),
+    labels: Object.keys(ventasYAbonosMensuales),
     datasets: [
       {
         label: 'Ventas Mensuales',
-        data: Object.values(ventasMensuales),
+        data: Object.values(ventasYAbonosMensuales).map(d => d.ventas),
         backgroundColor: 'rgba(59, 130, 246, 0.6)',
         borderColor: 'rgba(59, 130, 246, 1)',
         borderWidth: 1,
       },
+      {
+        label: 'Abonos Mensuales',
+        data: Object.values(ventasYAbonosMensuales).map(d => d.abonos),
+        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+        borderColor: 'rgba(16, 185, 129, 1)',
+        borderWidth: 1,
+      },
     ],
-  }), [ventasMensuales])
+  }), [ventasYAbonosMensuales])
 
   const datosGraficoLineas = useMemo(() => ({
-    labels: ventasFiltradas.map(venta => {
-      const cita = citas.find(cita => cita.venta_id === venta.id)
-      return cita ? new Date(cita.service_date).toLocaleDateString() : ''
-    }),
+    labels: abonos.map(abono => new Date(abono.fecha_abono).toLocaleDateString()),
     datasets: [
       {
-        label: 'Ventas Diarias',
-        data: ventasFiltradas.map(venta => venta.price),
+        label: 'Abonos Diarios',
+        data: abonos.map(abono => abono.cantidad_abonada),
         fill: false,
         borderColor: 'rgb(16, 185, 129)',
         tension: 0.1,
       },
     ],
-  }), [ventasFiltradas, citas])
+  }), [abonos])
 
   const datosGraficoCircular = useMemo(() => {
     const labels: string[] = []
@@ -194,16 +217,55 @@ export default function InformesNegocio() {
     }
   }, [ventasPorTrabajador, trabajadoresMap])
 
-  useEffect(() => {
-    setDebugInfo(prevInfo => 
-      `${prevInfo}\nVentas por Trabajador: ${JSON.stringify(ventasPorTrabajador)}\nDatos Gráfico Circular: ${JSON.stringify(datosGraficoCircular)}`
-    )
-  }, [ventasPorTrabajador, datosGraficoCircular])
+  const datosGraficoBarrasApiladas = useMemo(() => {
+    const labels = Object.keys(ventasYAbonosMensuales)
+    const ventasTotales = Object.values(ventasYAbonosMensuales).map(d => d.ventas)
+    const abonosTotales = Object.values(ventasYAbonosMensuales).map(d => d.abonos)
+    const pendientes = ventasTotales.map((venta, index) => Math.max(0, venta - abonosTotales[index]))
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Abonado',
+          data: abonosTotales,
+          backgroundColor: 'rgba(16, 185, 129, 0.6)',
+          borderColor: 'rgba(16, 185, 129, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Pendiente',
+          data: pendientes,
+          backgroundColor: 'rgba(239, 68, 68, 0.6)',
+          borderColor: 'rgba(239, 68, 68, 1)',
+          borderWidth: 1,
+        },
+      ],
+    }
+  }, [ventasYAbonosMensuales])
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+      },
+    },
+    scales: {
+      x: {
+        stacked: true,
+      },
+      y: {
+        stacked: true,
+      },
+    },
+  }
 
   if (cargando) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-4 border-b-4 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-600"></div>
       </div>
     )
   }
@@ -220,99 +282,102 @@ export default function InformesNegocio() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
       <Header />
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-extrabold text-gray-900 mb-8">Informes de Negocio</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <motion.div className="bg-white shadow-md rounded-lg p-4" whileHover={{ scale: 1.03 }}>
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-600 rounded-md p-3">
-                <DollarSign className="h-8 w-8 text-white" />
+              <div className="flex-shrink-0 bg-blue-500 rounded-md p-2">
+                <DollarSign className="h-6 w-6 text-white" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Total Ventas</dt>
-                  <dd>
-                    <div className="text-lg font-bold text-gray-900">${ventasTotales.toFixed(2)}</div>
-                  </dd>
+                  <dd className="text-lg font-semibold text-gray-900">${ventasTotales.toFixed(2)}</dd>
                 </dl>
               </div>
             </div>
           </motion.div>
 
-          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+          <motion.div className="bg-white shadow-md rounded-lg p-4" whileHover={{ scale: 1.03 }}>
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                <TrendingUp className="h-8 w-8 text-white" />
+              <div className="flex-shrink-0 bg-green-500 rounded-md p-2">
+                <CreditCard className="h-6 w-6 text-white" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Valor Promedio Venta</dt>
-                  <dd>
-                    <div className="text-lg font-bold text-gray-900">${valorPromedioVenta.toFixed(2)}</div>
-                  </dd>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Abonos</dt>
+                  <dd className="text-lg font-semibold text-gray-900">${abonosTotales.toFixed(2)}</dd>
                 </dl>
               </div>
             </div>
           </motion.div>
 
-          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+          <motion.div className="bg-white shadow-md rounded-lg p-4" whileHover={{ scale: 1.03 }}>
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-blue-600 rounded-md p-3">
-                <Users className="h-8 w-8 text-white" />
+              <div className="flex-shrink-0 bg-yellow-500 rounded-md p-2">
+                <TrendingUp className="h-6 w-6 text-white" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 w-0 flex-1">
+                
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Trabajadores Activos</dt>
-                  <dd>
-                    <div className="text-lg font-bold text-gray-900">{trabajadores.length}</div>
-                  </dd>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Promedio Venta</dt>
+                  <dd className="text-lg font-semibold text-gray-900">${valorPromedioVenta.toFixed(2)}</dd>
                 </dl>
               </div>
             </div>
           </motion.div>
 
-          <motion.div className="bg-white shadow-lg rounded-xl p-6" whileHover={{ scale: 1.05 }}>
+          <motion.div className="bg-white shadow-md rounded-lg p-4" whileHover={{ scale: 1.03 }}>
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-purple-600 rounded-md p-3">
-                <Calendar className="h-8 w-8 text-white" />
+              <div className="flex-shrink-0 bg-purple-500 rounded-md p-2">
+                <Users className="h-6 w-6 text-white" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Citas Registradas</dt>
-                  <dd>
-                    <div className="text-lg font-bold text-gray-900">{citas.length}</div>
-                  </dd>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Trabajadores</dt>
+                  <dd className="text-lg font-semibold text-gray-900">{trabajadores.length}</dd>
                 </dl>
               </div>
             </div>
           </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-8">
-          <div className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-xl font-semibold mb-4">Ventas Mensuales</h2>
-            <Bar data={datosGraficoBarras} options={{ responsive: true }} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="bg-white shadow-md rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-2">Ventas y Abonos Mensuales</h2>
+            <div className="h-64">
+              <Bar data={datosGraficoBarras} options={chartOptions} />
+            </div>
           </div>
 
-          <div className="bg-white shadow-lg rounded-xl p-6">
-            <h2 className="text-xl font-semibold mb-4">Ventas Diarias</h2>
-            <Line data={datosGraficoLineas} options={{ responsive: true }} />
+          <div className="bg-white shadow-md rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-2">Abonos Diarios</h2>
+            <div className="h-64">
+              <Line data={datosGraficoLineas} options={chartOptions} />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white shadow-lg rounded-xl p-6 mt-8">
-          <h2 className="text-xl font-semibold mb-4">Distribución de Ventas por Trabajador</h2>
-          <Pie data={datosGraficoCircular} options={{ responsive: true }} />
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white shadow-md rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-2">Ventas por Trabajador</h2>
+            <div className="h-64">
+              <Pie data={datosGraficoCircular} options={chartOptions} />
+            </div>
+          </div>
 
-        {debugInfo && (
-          <pre className="mt-8 p-4 bg-gray-200 rounded-md">
-            <h3 className="font-bold">Información de Depuración:</h3>
-            <code>{debugInfo}</code>
-          </pre>
-        )}
+          <div className="bg-white shadow-md rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-2">Estado de Pagos Mensuales</h2>
+            <div className="h-64">
+              <Bar data={datosGraficoBarrasApiladas} options={chartOptions} />
+            </div>
+            <div className="mt-2 text-center">
+              <p className="text-lg font-semibold">{porcentajeAbonado.toFixed(2)}% del total ha sido abonado</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

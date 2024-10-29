@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Calendar, DollarSign,  UserPlus, BarChart2, FileText,  LogOut, Bell, Menu } from 'lucide-react'
+import { Users, Calendar, DollarSign, UserPlus, BarChart2, FileText, LogOut, Bell, Menu, Briefcase, Eye, Clock } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import supabase from '../../../lib/supabaseClient'
 
-function Header() {
+function Header({ onLogout }: { onLogout: () => void }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
   return (
     <motion.header 
       initial={{ opacity: 0, y: -50 }}
@@ -15,9 +17,9 @@ function Header() {
       transition={{ duration: 0.5 }}
       className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
     >
-      <div className="flex items-center space-x-4">
+       <div className="flex items-center space-x-4">
         <Image
-          src="/imagen1.png" 
+          src="/Imagen1.png"
           alt="Logo de Angeles"
           width={50}
           height={50}
@@ -36,9 +38,28 @@ function Header() {
         <button className="text-white hover:text-gray-200 transition-colors">
           <Bell size={24} />
         </button>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Menu size={24} />
-        </button>
+        <div className="relative">
+          <button 
+            className="text-white hover:text-gray-200 transition-colors"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            <Menu size={24} />
+          </button>
+          {isMenuOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md overflow-hidden shadow-xl z-10">
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false)
+                  onLogout()
+                }}
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+              >
+                <LogOut className="inline-block mr-2 h-4 w-4" />
+                Cerrar Sesión
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </motion.header>
   )
@@ -69,9 +90,9 @@ function ActionCard({ title, description, icon, link }: {
   )
 }
 
-export default function JefeDashboard() {
-  const [workerName, setWorkerName] = useState('')
-  const [role, setRole] = useState(null)
+export default function Dashboard() {
+  const [userName, setUserName] = useState('')
+  const [role, setRole] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -84,7 +105,7 @@ export default function JefeDashboard() {
 
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('role, name') // Obtener también el nombre
+        .select('role, name')
         .eq('email', user.email)
         .single()
 
@@ -93,8 +114,8 @@ export default function JefeDashboard() {
         return
       }
 
-      setWorkerName(userData.name) // Asignar el nombre
-      setRole(userData.role) // Asignar el rol
+      setUserName(userData.name)
+      setRole(userData.role)
     }
 
     fetchUserRole()
@@ -119,15 +140,89 @@ export default function JefeDashboard() {
     )
   }
 
-  if (role !== 'admin') {
+  if (role !== 'admin' && role !== 'worker') {
     window.location.href = '/autorizacion'
     return null
   }
 
+  const commonCards = [
+    {
+      title: "Registrar Venta",
+      description: "Ingresar una nueva venta o servicio realizado.",
+      icon: <DollarSign className="h-8 w-8 text-white" />,
+      link: "/ventas"
+    },
+    {
+      title: "Gestión de Clientes",
+      description: "Administrar información y datos de los clientes.",
+      icon: <Users className="h-8 w-8 text-white" />,
+      link: "/gestionclientes"
+    },
+    {
+      title: "Registro de Clientes",
+      description: "Ver y analizar la base de datos de clientes.",
+      icon: <UserPlus className="h-8 w-8 text-white" />,
+      link: "/cliente"
+    },
+    {
+      title: "Agenda",
+      description: "Ver y gestionar citas y tareas.",
+      icon: <Calendar className="h-8 w-8 text-white" />,
+      link: "/agenda"
+    },
+    {
+      title: "Agregar Citas",
+      description: "Programar nuevas citas para los clientes.",
+      icon: <Clock className="h-8 w-8 text-white" />,
+      link: "/citas"
+    }
+  ]
+
+  const adminCards = [
+    {
+      title: "Gestión de Trabajadores",
+      description: "Administrar información y rendimiento de los empleados.",
+      icon: <Users className="h-8 w-8 text-white" />,
+      link: "/admworker"
+    },
+    {
+      title: "Reportes",
+      description: "Generar y ver reportes detallados del negocio.",
+      icon: <BarChart2 className="h-8 w-8 text-white" />,
+      link: "/reporte"
+    },
+    {
+      title: "Comisiones",
+      description: "Calcular y gestionar comisiones de los trabajadores.",
+      icon: <FileText className="h-8 w-8 text-white" />,
+      link: "/comision"
+    },
+    {
+      title: "Crear usuarios",
+      description: "Crear usuarios dependiendo de su rol",
+      icon: <UserPlus className="h-8 w-8 text-white" />,
+      link: "/dashboard"
+    },
+    {
+      title: "Gestión de Servicios",
+      description: "Administrar y actualizar los servicios ofrecidos.",
+      icon: <Briefcase className="h-8 w-8 text-white" />,
+      link: "/servicio"
+    },
+    {
+      title: "Ver ventas activas",
+      description: "Mira las ventas que estan activas e inactivas.",
+      icon: <Eye className="h-8 w-8 text-white" />,
+      link: "/verventas"
+    }
+  ]
+
+  const cards = role === 'admin' ? [...commonCards, ...adminCards] : commonCards
+
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <Header />
+        <Header onLogout={handleLogout} />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -137,7 +232,7 @@ export default function JefeDashboard() {
           <div className="p-6 sm:p-10">
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-bold text-gray-800">
-                Bienvenido, {workerName} {/* Mostrar el nombre en lugar del email */}
+                Bienvenido, {userName}
               </h1>
               <motion.button 
                 whileHover={{ scale: 1.05 }}
@@ -150,60 +245,15 @@ export default function JefeDashboard() {
               </motion.button>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <ActionCard 
-                title="Gestión de Trabajadores" 
-                description="Administrar información y rendimiento de los empleados."
-                icon={<Users className="h-8 w-8 text-white" />}
-                link="/admworker"
-              />
-                 <ActionCard 
-                title="Registrar Venta" 
-                description="Ingresar una nueva venta o servicio realizado."
-                icon={<DollarSign className="h-8 w-8 text-white" />}
-                link="/ventas"
-              />
-              <ActionCard 
-                title="Gestión de Clientes" 
-                description="Administrar información y datos de los clientes."
-                icon={<Users className="h-8 w-8 text-white" />}
-                link="/gestionclientes"
-              />
-              <ActionCard 
-                title="Agenda General" 
-                description="Ver y gestionar todas las citas y tareas de la empresa."
-                icon={<Calendar className="h-8 w-8 text-white" />}
-                link="/agenda"
-              />
-              <ActionCard 
-                title="Finanzas y Ventas" 
-                description="Analizar ventas, gastos y ganancias de la empresa."
-                icon={<DollarSign className="h-8 w-8 text-white" />}
-                link="/jefe/finanzas"
-              />
-              <ActionCard 
-                title="Registro de Clientes" 
-                description="Ver y analizar la base de datos de clientes."
-                icon={<UserPlus className="h-8 w-8 text-white" />}
-                link="/cliente"
-              />
-              <ActionCard 
-                title="Reportes" 
-                description="Generar y ver reportes detallados del negocio."
-                icon={<BarChart2 className="h-8 w-8 text-white" />}
-                link="/reporte"
-              />
-              <ActionCard 
-                title="Comisiones" 
-                description="Calcular y gestionar comisiones de los trabajadores."
-                icon={<FileText className="h-8 w-8 text-white" />}
-                link="/comision"
-              />
-              <ActionCard 
-                title="Crear usuarios" 
-                description="Crear usuarios dependiendo de su rol"
-                icon={<UserPlus className="h-8 w-8 text-white" />}
-                link="/dashboard"
-              />
+              {cards.map((card, index) => (
+                <ActionCard 
+                  key={index}
+                  title={card.title}
+                  description={card.description}
+                  icon={card.icon}
+                  link={card.link}
+                />
+              ))}
             </div>
           </div>
         </motion.div>

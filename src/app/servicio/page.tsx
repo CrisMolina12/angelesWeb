@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, } from 'framer-motion'
 import Image from 'next/image'
 import supabase from '../../../lib/supabaseClient'
-import { Plus,  Edit, X, Check, ToggleLeft, ToggleRight, Bell, Menu } from 'lucide-react'
-
+import { Plus,  Edit, X, Check, ToggleLeft, ToggleRight, Home } from 'lucide-react'
+import Link from 'next/link'
 interface Servicio {
   id: number
   name_servicio: string
@@ -41,13 +41,12 @@ function Header() {
           Angeles
         </motion.span>
       </div>
+      
       <div className="flex items-center space-x-4">
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Bell size={24} />
-        </button>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Menu size={24} />
-        </button>
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors">
+            <Home size={24} />
+            <span className="sr-only">Volver a la página principal</span>
+          </Link>
       </div>
     </motion.header>
   )

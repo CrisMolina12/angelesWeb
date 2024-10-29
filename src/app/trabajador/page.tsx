@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Calendar, DollarSign, UserPlus, Clipboard, LogOut, Bell, Menu } from 'lucide-react'
+import { Calendar, DollarSign, UserPlus, Clipboard, LogOut, Bell, Menu, Clock } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -71,7 +71,7 @@ function ActionCard({ title, description, icon, link }: {
 
 export default function TrabajadorDashboard() {
   const [email, setEmail] = useState('')
-  const [name, setName] = useState('') // Nueva variable para el nombre
+  const [name, setName] = useState('')
   const [role, setRole] = useState(null)
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function TrabajadorDashboard() {
 
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('role, name') // Ahora también seleccionamos el nombre
+        .select('role, name')
         .eq('email', user.email)
         .single()
 
@@ -97,7 +97,7 @@ export default function TrabajadorDashboard() {
       }
 
       setRole(userData.role)
-      setName(userData.name) // Guardamos el nombre del trabajador
+      setName(userData.name)
     }
 
     fetchUserRole()
@@ -140,7 +140,7 @@ export default function TrabajadorDashboard() {
           <div className="p-6 sm:p-10">
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-bold text-gray-800">
-                Bienvenido, {name ? name : email} {/* Mostrar el nombre si está disponible */}
+                Bienvenido, {name ? name : email}
               </h1>
               <motion.button 
                 whileHover={{ scale: 1.05 }}
@@ -176,6 +176,12 @@ export default function TrabajadorDashboard() {
                 description="Administrar información y datos de los clientes."
                 icon={<Clipboard className="h-8 w-8 text-white" />}
                 link="/gestionclientes"
+              />
+              <ActionCard 
+                title="Agregar Citas" 
+                description="Programar nuevas citas para los clientes."
+                icon={<Clock className="h-8 w-8 text-white" />}
+                link="/citas"
               />
             </div>
           </div>

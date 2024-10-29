@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import supabase from "../../../lib/supabaseClient"
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Clock, DollarSign, FileText, User, Check, X, Bell, Menu, LogOut, Package, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
+import { Calendar, DollarSign, FileText, User, Check, X, Bell, Menu, LogOut, Package, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
 
 type SaleFormData = {
   rut: string
@@ -50,7 +50,6 @@ type SaleSummary = {
   total: number
   tipoPago: string
   abono: number
-  comision: number
 }
 
 type TipoPago = {
@@ -88,7 +87,6 @@ export default function RegistrarVenta() {
   const [saleSummary, setSaleSummary] = useState<SaleSummary | null>(null)
   const [showTimeModal, setShowTimeModal] = useState(false)
   const [abono, setAbono] = useState<number>(0)
-  const [comision, setComision] = useState<number>(0)
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -229,8 +227,8 @@ export default function RegistrarVenta() {
   const calcularComision = (abono: number, tipoPagoId: number) => {
     const tipoPagoSeleccionado = tiposPago.find(tipo => tipo.id_tipo_pago === tipoPagoId)
     if (tipoPagoSeleccionado) {
-      const comisionBase = (abono * tipoPagoSeleccionado.porcentaje) / 100
-      return comisionBase * 0.1 // 10% de la comisión base
+      const montoConPorcentajeTipoPago = abono * (1 - tipoPagoSeleccionado.porcentaje / 100)
+      return Math.round(montoConPorcentajeTipoPago * 0.1) // 10% de la comisión después de aplicar el porcentaje del tipo de pago, redondeado
     }
     return 0
   }
@@ -263,9 +261,8 @@ export default function RegistrarVenta() {
 
     try {
       const total = saleFormData.detalles.reduce((sum, detalle) => {
-        const cantidad = parseInt(detalle.cantidad as string) || 0;
         const precio = parseInt(detalle.precio as string) || 0;
-        return sum + cantidad * precio;
+        return sum + precio;
       }, 0);
 
       const tipoPagoId = parseInt(saleFormData.tipoPago)
@@ -294,7 +291,6 @@ export default function RegistrarVenta() {
           })
         }
 
-        // Guardar la comisión
         await supabase.from('comision').insert({
           ventas_id_venta: datosVenta.id,
           empleado_id_empleado: idEmpleado,
@@ -303,7 +299,6 @@ export default function RegistrarVenta() {
         })
 
         setVentaId(datosVenta.id)
-        setComision(comisionCalculada)
         setStep('schedule')
         setMensaje({ tipo: 'exito', texto: 'Venta registrada con éxito. Ahora, agende la cita.' })
       } else {
@@ -353,7 +348,7 @@ export default function RegistrarVenta() {
 
       await createSaleSummary()
       setStep('summary')
-      setMensaje({ tipo: 'exito', texto: '¡La cita ha sido agendada  con éxito!' })
+      setMensaje({ tipo: 'exito', texto: '¡La cita ha sido agendada con éxito!' })
     } catch (error) {
       console.error('Error al agendar la cita:', error)
       setMensaje({ tipo: 'error', texto: 'Ocurrió un error al agendar la cita.' })
@@ -363,6 +358,7 @@ export default function RegistrarVenta() {
   const createSaleSummary = async () => {
     try {
       const { data: clientData, error: clientError } = await supabase
+        
         .from('clients')
         .select('name')
         .eq('rut', saleFormData.rut)
@@ -386,7 +382,7 @@ export default function RegistrarVenta() {
         }
       }))
 
-      const total = serviciosVenta.reduce((sum, servicio) => sum + servicio.cantidad * servicio.precio, 0);
+      const total = serviciosVenta.reduce((sum, servicio) => sum + servicio.precio, 0);
       setSaleSummary({
         clientName: clientData.name,
         rut: saleFormData.rut,
@@ -396,8 +392,7 @@ export default function RegistrarVenta() {
         endTime: scheduleFormData.horaFin,
         total: Math.round(total),
         tipoPago: tiposPago.find(tipo => tipo.id_tipo_pago === parseInt(saleFormData.tipoPago))?.name_comision || 'Desconocido',
-        abono: Math.round(abono),
-        comision: Math.round(comision)
+        abono: Math.round(abono)
       })
     } catch (error) {
       console.error('Error al crear el resumen de la venta:', error)
@@ -712,7 +707,7 @@ export default function RegistrarVenta() {
                       type="text"
                       id="abono"
                       name="abono"
-                      value={abono === 0 ? '' : `$${abono.toLocaleString('es-CL')}`}
+                      value={abono === 0 ? '' : `$${Number(abono).toLocaleString('es-CL')}`}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^\d]/g, '');
                         handleSaleInputChange({ target: { name: 'abono', value } });
@@ -731,44 +726,43 @@ export default function RegistrarVenta() {
                       name="descripcion"
                       value={saleFormData.descripcion}
                       onChange={handleSaleInputChange}
-                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
                       rows={3}
-                      placeholder="Ingrese una descripción de la venta"
+                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                      placeholder="Ingrese una descripción"
                     ></textarea>
                   </div>
                 </div>
-                <div className="flex justify-end">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    className="bg-purple-600 text-white py-2 px-6 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center"
-                  >
-                    Registrar Venta <Check className="ml-2" size={20} />
-                  </motion.button>
-                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="submit"
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center justify-center"
+                >
+                  <DollarSign size={20} className="mr-2" />
+                  Registrar Venta
+                </motion.button>
               </form>
             )}
             {step === 'schedule' && (
               <form onSubmit={handleScheduleSubmit} className="space-y-6">
-                <div className="flex justify-between items-center mb-4">
-                  <button type="button" onClick={prevMonth} className="text-purple-600 hover:text-purple-800">
-                    <ChevronLeft size={24} />
-                  </button>
-                  <h3 className="text-lg font-semibold">
-                    {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                  </h3>
-                  <button type="button" onClick={nextMonth} className="text-purple-600 hover:text-purple-800">
-                    <ChevronRight size={24} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-7 gap-2 mb-4">
-                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day) => (
-                    <div key={day} className="text-center font-medium text-gray-500">
-                      {day}
-                    </div>
-                  ))}
-                  {renderCalendar()}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-4">
+                    <button type="button" onClick={prevMonth} className="text-purple-600 hover:text-purple-800">
+                      <ChevronLeft size={24} />
+                    </button>
+                    <h3 className="text-lg font-semibold">
+                      {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <button type="button" onClick={nextMonth} className="text-purple-600 hover:text-purple-800">
+                      <ChevronRight size={24} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2 text-center">
+                    {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
+                      <div key={day} className="font-medium text-gray-500">{day}</div>
+                    ))}
+                    {renderCalendar()}
+                  </div>
                 </div>
                 <AnimatePresence>
                   {showTimeModal && (
@@ -787,92 +781,66 @@ export default function RegistrarVenta() {
                         <div className="space-y-4">
                           <div>
                             <label htmlFor="horaInicio" className="block text-sm font-medium text-gray-700 mb-1">Hora de Inicio</label>
-                            <div className="relative">
-                              <Clock className="absolute top-3 left-3 text-gray-400" size={20} />
-                              <input
-                                type="time"
-                                id="horaInicio"
-                                name="horaInicio"
-                                value={scheduleFormData.horaInicio}
-                                onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaInicio: e.target.value }))}
-                                required
-                                className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                              />
-                            </div>
+                            <input
+                              type="time"
+                              id="horaInicio"
+                              name="horaInicio"
+                              value={scheduleFormData.horaInicio}
+                              onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaInicio: e.target.value }))}
+                              required
+                              className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                            />
                           </div>
                           <div>
                             <label htmlFor="horaFin" className="block text-sm font-medium text-gray-700 mb-1">Hora de Fin</label>
-                            <div className="relative">
-                              <Clock className="absolute top-3 left-3 text-gray-400" size={20} />
-                              <input
-                                type="time"
-                                id="horaFin"
-                                name="horaFin"
-                                value={scheduleFormData.horaFin}
-                                onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaFin: e.target.value }))}
-                                required
-                                className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                              />
-                            </div>
+                            <input
+                              type="time"
+                              id="horaFin"
+                              name="horaFin"
+                              value={scheduleFormData.horaFin}
+                              onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaFin: e.target.value }))}
+                              required
+                              className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                            />
                           </div>
                         </div>
                         <div className="mt-6 flex justify-end space-x-3">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                          <button
                             type="button"
                             onClick={() => setShowTimeModal(false)}
                             className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-300"
                           >
                             Cancelar
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            type="submit"
+                          </button>
+                          <button
+                            type="button"
                             onClick={handleTimeSelection}
                             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-300"
                           >
                             Confirmar
-                          </motion.button>
+                          </button>
                         </div>
                       </motion.div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Fecha seleccionada:</p>
-                    <p className="text-lg font-semibold text-purple-600">
-                      {scheduleFormData.fechaServicio.toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Hora:</p>
-                    <p className="text-lg font-semibold text-purple-600">
-                      {scheduleFormData.horaInicio} - {scheduleFormData.horaFin}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha y Hora Seleccionadas</label>
+                  <div className="bg-gray-100 p-4 rounded-lg">
+                    <p className="text-lg font-semibold">
+                      {scheduleFormData.fechaServicio.toLocaleDateString()} - {scheduleFormData.horaInicio} a {scheduleFormData.horaFin}
                     </p>
                   </div>
                 </div>
-                <div className="flex justify-end space-x-3">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    onClick={() => setStep('sale')}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-300"
-                  >
-                    Volver
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-300 flex items-center"
-                  >
-                    Agendar Cita <Calendar className="ml-2" size={20} />
-                  </motion.button>
-                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="submit"
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center justify-center"
+                >
+                  <Calendar size={20} className="mr-2" />
+                  Agendar Cita
+                </motion.button>
               </form>
             )}
             {step === 'summary' && saleSummary && (
@@ -895,15 +863,14 @@ export default function RegistrarVenta() {
                     <p><span className="font-medium">Total:</span> ${saleSummary.total.toLocaleString('es-CL')} CLP</p>
                     <p><span className="font-medium">Tipo de Pago:</span> {saleSummary.tipoPago}</p>
                     <p><span className="font-medium">Abono:</span> ${saleSummary.abono.toLocaleString('es-CL')} CLP</p>
-                    <p><span className="font-medium">Comisión:</span> ${saleSummary.comision.toLocaleString('es-CL')} CLP</p>
                   </div>
                 </div>
-                <div className="flex justify-end space-x-3">
+                <div className="flex space-x-4">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleVolverAlMenu}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-300"
+                    className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition duration-300 flex items-center justify-center"
                   >
                     Volver al Menú
                   </motion.button>
@@ -923,14 +890,11 @@ export default function RegistrarVenta() {
                         horaInicio: '',
                         horaFin: ''
                       })
+                      setAbono(0)
                       setStep('sale')
                       setMensaje(null)
-                      setVentaId(null)
-                      setSaleSummary(null)
-                      setAbono(0)
-                      setComision(0)
                     }}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-300"
+                    className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center justify-center"
                   >
                     Nueva Venta
                   </motion.button>
