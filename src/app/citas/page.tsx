@@ -277,23 +277,23 @@ export default function AssignAppointments() {
           transition={{ duration: 0.5 }}
           className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-lg mb-8 rounded-2xl"
         >
-          <div className="flex items-center space-x-4">
-            <Image
-              src="/imagen1.png" 
-              alt="Logo de Angeles"
-              width={50}
-              height={50}
-              className="rounded-full border-2 border-white shadow-md"
-            />
-            <motion.span 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="text-2xl font-bold tracking-wide"
-            >
-              Angeles
-            </motion.span>
-          </div>
+        <div className="flex items-center space-x-2 sm:space-x-4">
+        <Image
+          src="/Imagen1.png" 
+          alt="Logo de Angeles"
+          width={40}
+          height={40}
+          className="rounded-full border-2 border-white shadow-md"
+        />
+        <motion.span 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="text-lg sm:text-2xl font-bold tracking-wide"
+        >
+          Angeles
+        </motion.span>
+      </div>
           <div className="flex items-center space-x-4">
             <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
               <Home size={24} />
