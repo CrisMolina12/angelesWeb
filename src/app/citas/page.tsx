@@ -4,13 +4,22 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '../../../lib/supabaseClient'
 import { motion } from 'framer-motion'
-import { Search, Plus, X, Edit2, Check, Bell, Menu, LogOut, Home, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, Edit2, Check, Home, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import moment from 'moment'
 import 'moment/locale/es'
 
 moment.locale('es')
+
+interface SupabaseResponse {
+  id: number
+  fecha_transaccion: string | null
+  clients: { name: string } | null
+  servicios: { name_servicio: string } | null
+  detalle_venta: { cant_sesiones: number }[]
+  citas: { id: number }[]
+}
 
 interface Sale {
   id: number
@@ -27,6 +36,7 @@ interface Appointment {
   start_time: string
   end_time: string
   description: string
+  asistio: boolean | null
 }
 
 export default function AssignAppointments() {
@@ -34,7 +44,7 @@ export default function AssignAppointments() {
   const [displayedSales, setDisplayedSales] = useState<Sale[]>([])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id'>>({
+  const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id' | 'asistio'>>({
     service_date: '',
     start_time: '',
     end_time: '',
@@ -45,7 +55,6 @@ export default function AssignAppointments() {
   const [error, setError] = useState<string | null>(null)
   const [editingSessions, setEditingSessions] = useState(false)
   const [newTotalSessions, setNewTotalSessions] = useState<number | ''>('')
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -73,17 +82,23 @@ export default function AssignAppointments() {
       }
 
       if (!data) {
-        throw new Error('No data returned from Supabase')
+        setAllSales([])
+        setDisplayedSales([])
+        return
       }
 
-      const formattedSales = data.map((sale) => ({
+      console.log('Raw data from Supabase:', data)
+
+      const formattedSales = (data as unknown as SupabaseResponse[]).map((sale): Sale => ({
         id: sale.id,
-        client_name: sale.clients?.[0]?.name ?? 'Cliente desconocido',
-        service_name: sale.servicios?.[0]?.name_servicio ?? 'Servicio desconocido',
+        client_name: sale.clients?.name || 'Cliente desconocido',
+        service_name: sale.servicios?.name_servicio || 'Servicio desconocido',
         fecha_transaccion: sale.fecha_transaccion || 'Fecha desconocida',
-        cant_sesiones: sale.detalle_venta?.[0]?.cant_sesiones ?? 1,
-        appointment_count: sale.citas?.length ?? 0,
+        cant_sesiones: sale.detalle_venta[0]?.cant_sesiones || 1,
+        appointment_count: sale.citas?.length || 0
       }))
+
+      console.log('Formatted sales:', formattedSales)
 
       setAllSales(formattedSales)
       updateDisplayedSales(formattedSales)
@@ -121,7 +136,7 @@ export default function AssignAppointments() {
 
   useEffect(() => {
     updateDisplayedSales(allSales)
-  }, [allSales, updateDisplayedSales])
+  }, [updateDisplayedSales, allSales])
 
   const fetchAppointments = async (saleId: number) => {
     try {
@@ -157,6 +172,7 @@ export default function AssignAppointments() {
           {
             ...newAppointment,
             venta_id: selectedSale.id,
+            asistio: null,
           },
         ])
         .select()
@@ -171,7 +187,6 @@ export default function AssignAppointments() {
         description: '',
       })
 
-      // Update the appointment count for the selected sale
       const updatedSale = { ...selectedSale, appointment_count: selectedSale.appointment_count + 1 }
       setSelectedSale(updatedSale)
       setAllSales(allSales.map(sale => sale.id === updatedSale.id ? updatedSale : sale))
@@ -195,7 +210,6 @@ export default function AssignAppointments() {
 
       setAppointments(appointments.filter(app => app.id !== appointmentId))
 
-      // Update the appointment count for the selected sale
       const updatedSale = { ...selectedSale, appointment_count: selectedSale.appointment_count - 1 }
       setSelectedSale(updatedSale)
       setAllSales(allSales.map(sale => sale.id === updatedSale.id ? updatedSale : sale))
@@ -232,26 +246,36 @@ export default function AssignAppointments() {
     }
   }
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (!error) {
-      setIsAuthenticated(false)
-      router.push('/login')
+  const handleAttendanceChange = async (appointmentId: number, asistio: boolean | null) => {
+    try {
+      const { error } = await supabase
+        .from('citas')
+        .update({ asistio })
+        .eq('id', appointmentId)
+
+      if (error) throw error
+
+      setAppointments(appointments.map(app => 
+        app.id === appointmentId ? { ...app, asistio } : app
+      ))
+    } catch (error) {
+      console.error('Error updating attendance:', error)
+      setError('Failed to update attendance. Please try again.')
     }
   }
 
   if (!isAuthenticated) {
-    return null // or a loading spinner
+    return null
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <motion.header 
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
+          className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-lg mb-8 rounded-2xl"
         >
           <div className="flex items-center space-x-4">
             <Image
@@ -271,32 +295,10 @@ export default function AssignAppointments() {
             </motion.span>
           </div>
           <div className="flex items-center space-x-4">
-            <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors">
+            <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
               <Home size={24} />
-              <span className="sr-only">Volver a la página principal</span>
+              <span className="hidden sm:inline">Volver al Menú</span>
             </Link>
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <Bell size={24} />
-            </button>
-            <div className="relative">
-              <button 
-                className="text-white hover:text-gray-200 transition-colors"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-              >
-                <Menu size={24} />
-              </button>
-              {isMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md overflow-hidden shadow-xl z-10">
-                  <button
-                    onClick={handleLogout}
-                    className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                  >
-                    <LogOut className="inline-block mr-2 h-4 w-4" />
-                    Cerrar Sesión
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
         </motion.header>
 
@@ -307,7 +309,7 @@ export default function AssignAppointments() {
           className="bg-white shadow-2xl rounded-3xl overflow-hidden"
         >
           <div className="p-6 sm:p-10">
-            <h1 className="text-3xl font-bold text-gray-800 mb-8">Asignar Citas Adicionales</h1>
+            <h1 className="text-4xl font-bold text-gray-800 mb-8">Asignar Citas Adicionales</h1>
 
             {error && (
               <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -351,14 +353,14 @@ export default function AssignAppointments() {
                         key={sale.id}
                         whileHover={{ scale: 1.02 }}
                         className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                          selectedSale?.id === sale.id ? 'bg-purple-100' : 'bg-white'
+                          selectedSale?.id === sale.id ? 'bg-purple-100 shadow-md' : 'bg-white hover:bg-gray-50'
                         }`}
                         onClick={() => handleSelectSale(sale)}
                       >
-                        <p className="font-semibold">{sale.client_name}</p>
+                        <p className="font-semibold text-lg">{sale.client_name}</p>
                         <p className="text-sm text-gray-600">{sale.service_name}</p>
                         <p className="text-sm text-gray-500">{moment(sale.fecha_transaccion).format('LL')}</p>
-                        <p className="text-sm text-purple-600 mt-2">
+                        <p className="text-sm text-purple-600 mt-2 font-medium">
                           Sesiones: {sale.appointment_count}/{sale.cant_sesiones}
                         </p>
                       </motion.div>
@@ -368,7 +370,6 @@ export default function AssignAppointments() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
-                      
                       className="p-2 bg-purple-500 text-white rounded-lg disabled:bg-gray-300"
                     >
                       <ChevronLeft size={20} />
@@ -427,30 +428,66 @@ export default function AssignAppointments() {
                             key={appointment.id}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex justify-between items-center bg-white p-3 rounded-lg"
+                            className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 space-y-2 sm:space-y-0 sm:space-x-2"
                           >
                             <div>
-                              <p className="font-semibold">{moment(appointment.service_date).format('LL')}</p>
+                              <p className="font-semibold text-lg">{moment(appointment.service_date).format('LL')}</p>
                               <p className="text-sm text-gray-600">
                                 {appointment.start_time} - {appointment.end_time}
                               </p>
-                              <p className="text-sm text-gray-500">{appointment.description}</p>
+                              <p className="text-sm text-gray-500 mt-1">{appointment.description}</p>
                             </div>
-                            <button
-                              onClick={() => handleDeleteAppointment(appointment.id)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X size={20} />
-                            </button>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                              <div className="flex space-x-1">
+                                <button
+                                  onClick={() => handleAttendanceChange(appointment.id, true)}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+                                    appointment.asistio === true
+                                      ? 'bg-green-500 text-white'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+                                  }`}
+                                >
+                                  Asistió
+                                </button>
+                                <button
+                                  onClick={() => handleAttendanceChange(appointment.id, false)}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+                                    appointment.asistio === false
+                                      ? 'bg-red-500 text-white'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-red-100'
+                                  }`}
+                                >
+                                  No Asistió
+                                </button>
+                                <button
+                                  onClick={() => handleAttendanceChange(appointment.id, null)}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+                                    appointment.asistio === null
+                                      ? 'bg-yellow-500 text-white'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'
+                                  }`}
+                                >
+                                  Pendiente
+                                </button>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteAppointment(appointment.id)}
+                                className="bg-red-100 text-red-600 hover:bg-red-200 p-1 rounded transition-colors duration-200 flex items-center"
+                              >
+                                <Trash2 size={14} />
+                                <span className="sr-only">Eliminar</span>
+                              </button>
+                            </div>
                           </motion.div>
                         ))}
                       </div>
-                      <form onSubmit={handleAddAppointment} className="space-y-4">
+                      <form onSubmit={handleAddAppointment} className="space-y-4 mt-6 bg-gray-50 p-4 rounded-lg">
+                        <h3 className="text-lg font-semibold mb-2">Agregar Nueva Cita</h3>
                         <input
                           type="date"
                           value={newAppointment.service_date}
                           onChange={(e) => setNewAppointment({ ...newAppointment, service_date: e.target.value })}
-                          className="w-full p-2 border rounded-lg"
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           required
                         />
                         <div className="flex space-x-2">
@@ -458,14 +495,14 @@ export default function AssignAppointments() {
                             type="time"
                             value={newAppointment.start_time}
                             onChange={(e) => setNewAppointment({ ...newAppointment, start_time: e.target.value })}
-                            className="w-1/2 p-2 border rounded-lg"
+                            className="w-1/2 p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             required
                           />
                           <input
                             type="time"
                             value={newAppointment.end_time}
                             onChange={(e) => setNewAppointment({ ...newAppointment, end_time: e.target.value })}
-                            className="w-1/2 p-2 border rounded-lg"
+                            className="w-1/2 p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             required
                           />
                         </div>
@@ -474,14 +511,14 @@ export default function AssignAppointments() {
                           value={newAppointment.description}
                           onChange={(e) => setNewAppointment({ ...newAppointment, description: e.target.value })}
                           placeholder="Descripción"
-                          className="w-full p-2 border rounded-lg"
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           required
                         />
                         <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           type="submit"
-                          className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center"
+                          className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center shadow-md hover:shadow-lg"
                         >
                           <Plus size={20} className="mr-2" />
                           Agregar Cita

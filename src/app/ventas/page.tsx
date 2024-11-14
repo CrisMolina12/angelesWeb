@@ -1,11 +1,12 @@
 'use client'
 
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import supabase from "../../../lib/supabaseClient"
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, DollarSign, FileText, User, Check, X, Bell, Menu, LogOut, Package, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
+import { DollarSign, FileText, User, Check, X, Package, ChevronLeft, ChevronRight, Plus, Minus, Home, PlusCircle, Calendar } from 'lucide-react'
+import Link from 'next/link'
 
 type SaleFormData = {
   rut: string
@@ -88,24 +89,7 @@ export default function RegistrarVenta() {
   const [showTimeModal, setShowTimeModal] = useState(false)
   const [abono, setAbono] = useState<number>(0)
 
-  useEffect(() => {
-    const initializeComponent = async () => {
-      await verificarSesion()
-      await obtenerRutsClientes()
-      await obtenerServicios()
-      await obtenerTiposPago()
-      await fetchScheduledDates()
-      setLoading(false)
-    }
-
-    initializeComponent()
-  }, [router])
-
-  useEffect(() => {
-    fetchScheduledDates()
-  }, [currentMonth])
-
-  const verificarSesion = async () => {
+  const verificarSesion = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
@@ -125,7 +109,49 @@ export default function RegistrarVenta() {
       setIdEmpleado(userData.id)
       setUserRole(userData.role as 'worker' | 'admin')
     }
-  }
+  }, [router])
+
+  const fetchScheduledDates = useCallback(async () => {
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
+
+    try {
+      const { data, error } = await supabase
+        .from('citas')
+        .select('service_date')
+        .gte('service_date', startOfMonth.toISOString())
+        .lte('service_date', endOfMonth.toISOString())
+
+      if (error) throw error
+      if (data) {
+        const countedDates = data.reduce((acc, { service_date }) => {
+          acc[service_date] = (acc[service_date] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+
+        setScheduledDates(Object.entries(countedDates).map(([date, count]) => ({ date, count })))
+      }
+    } catch (error) {
+      console.error('Error al obtener las fechas agendadas:', error)
+    }
+  }, [currentMonth])
+
+  useEffect(() => {
+    const initializeComponent = async () => {
+      await verificarSesion()
+      await obtenerRutsClientes()
+      await obtenerServicios()
+      await obtenerTiposPago()
+      await fetchScheduledDates()
+      setLoading(false)
+    }
+
+    initializeComponent()
+  }, [verificarSesion, fetchScheduledDates])
+
+  useEffect(() => {
+    fetchScheduledDates()
+  }, [currentMonth, fetchScheduledDates])
 
   const obtenerRutsClientes = async () => {
     try {
@@ -170,31 +196,6 @@ export default function RegistrarVenta() {
     }
   }
 
-  const fetchScheduledDates = async () => {
-    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
-
-    try {
-      const { data, error } = await supabase
-        .from('citas')
-        .select('service_date')
-        .gte('service_date', startOfMonth.toISOString())
-        .lte('service_date', endOfMonth.toISOString())
-
-      if (error) throw error
-      if (data) {
-        const countedDates = data.reduce((acc, { service_date }) => {
-          acc[service_date] = (acc[service_date] || 0) + 1
-          return acc
-        }, {} as Record<string, number>)
-
-        setScheduledDates(Object.entries(countedDates).map(([date, count]) => ({ date, count })))
-      }
-    } catch (error) {
-      console.error('Error al obtener las fechas agendadas:', error)
-    }
-  }
-
   const handleSaleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | { target: { name: string; value: string } }, index?: number) => {
     const { name, value } = e.target
     if (index !== undefined && name !== 'rut' && name !== 'descripcion' && name !== 'tipoPago') {
@@ -212,7 +213,9 @@ export default function RegistrarVenta() {
       }
       setSaleFormData(prev => ({ ...prev, detalles: newDetalles }))
     } else if (name === 'abono') {
-      setAbono(parseFloat(value) || 0)
+      const newAbono = parseFloat(value) || 0
+      const totalPrice = saleFormData.detalles.reduce((sum, detalle) => sum + (parseFloat(detalle.precio as string) || 0), 0)
+      setAbono(Math.min(newAbono, totalPrice))
     } else if (name === 'servicioId') {
       setSaleFormData(prev => ({ ...prev, servicioId: value }))
     } else {
@@ -358,7 +361,6 @@ export default function RegistrarVenta() {
   const createSaleSummary = async () => {
     try {
       const { data: clientData, error: clientError } = await supabase
-        
         .from('clients')
         .select('name')
         .eq('rut', saleFormData.rut)
@@ -471,6 +473,24 @@ export default function RegistrarVenta() {
     }
   }
 
+  const handleNuevaVenta = () => {
+    setSaleFormData({
+      rut: '',
+      detalles: [{ servicioId: '', cantidad: '', precio: '' }],
+      descripcion: '',
+      tipoPago: '',
+      servicioId: ''
+    })
+    setScheduleFormData({
+      fechaServicio: new Date(),
+      horaInicio: '',
+      horaFin: ''
+    })
+    setAbono(0)
+    setStep('sale')
+    setMensaje(null)
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50">
@@ -484,7 +504,7 @@ export default function RegistrarVenta() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <motion.header 
           initial={{ opacity: 0, y: -50 }}
@@ -504,21 +524,16 @@ export default function RegistrarVenta() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className="text-2xl font-bold tracking-wide"
+              className="text-2xl font-bold tracking-wide text-white"
             >
               Angeles
             </motion.span>
           </div>
           <div className="flex items-center space-x-4">
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <Bell size={24} />
-            </button>
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <Menu size={24} />
-            </button>
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <LogOut size={24} />
-            </button>
+            <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+              <Home size={24} />
+              <span className="hidden sm:inline">Volver al Menú</span>
+            </Link>
           </div>
         </motion.header>
         <motion.div 
@@ -528,7 +543,7 @@ export default function RegistrarVenta() {
           className="bg-white shadow-2xl rounded-3xl overflow-hidden"
         >
           <div className="px-6 py-8 sm:p-10">
-            <h2 className="text-3xl font-extrabold text-center mb-8 text-gray-900">
+            <h2 className="text-3xl font-extrabold text-center mb-8 text-purple-800">
               {step === 'sale' ? 'Registrar Nueva Venta' : step === 'schedule' ? 'Agendar Cita' : 'Resumen de Venta y Cita'}
             </h2>
             <AnimatePresence>
@@ -568,7 +583,7 @@ export default function RegistrarVenta() {
                 <div>
                   <label htmlFor="rut" className="block text-sm font-medium text-gray-700 mb-1">RUT del cliente</label>
                   <div className="relative">
-                    <User className="absolute top-3 left-3 text-gray-400" size={20} />
+                    <User className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" size={20} />
                     <input
                       type="text"
                       id="rut"
@@ -578,7 +593,7 @@ export default function RegistrarVenta() {
                       onFocus={() => setRutsFiltrados(rutsClientes)}
                       onBlur={() => setTimeout(() => setRutsFiltrados([]), 200)}
                       required
-                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
                       placeholder="Ingrese RUT del cliente"
                     />
                   </div>
@@ -607,18 +622,24 @@ export default function RegistrarVenta() {
                   </AnimatePresence>
                 </div>
                 {saleFormData.detalles.map((detalle, index) => (
-                  <div key={index} className="space-y-4">
+                  <motion.div 
+                    key={index} 
+                    className="space-y-4 p-4 bg-gray-50 rounded-lg shadow-sm"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
                     <div>
                       <label htmlFor={`servicioId-${index}`} className="block text-sm font-medium text-gray-700 mb-1">Servicio</label>
                       <div className="relative">
-                        <Package className="absolute top-3 left-3 text-gray-400" size={20} />
+                        <Package className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" size={20} />
                         <select
                           id={`servicioId-${index}`}
                           name="servicioId"
                           value={detalle.servicioId}
                           onChange={(e) => handleSaleInputChange(e, index)}
                           required
-                          className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                          className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
                         >
                           <option value="">Seleccione un servicio</option>
                           {servicios.map((servicio) => (
@@ -640,13 +661,13 @@ export default function RegistrarVenta() {
                           onChange={(e) => handleSaleInputChange(e, index)}
                           required
                           min="0"
-                          className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                          className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
                         />
                       </div>
                       <div className="flex-1">
                         <label htmlFor={`precio-${index}`} className="block text-sm font-medium text-gray-700 mb-1">Precio</label>
                         <div className="relative">
-                          <DollarSign className="absolute top-3 left-3 text-gray-400" size={20} />
+                          <DollarSign className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" size={20} />
                           <input
                             type="text"
                             id={`precio-${index}`}
@@ -657,7 +678,7 @@ export default function RegistrarVenta() {
                               handleSaleInputChange({ target: { name: 'precio', value } }, index);
                             }}
                             required
-                            className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
+                            className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
                             placeholder="$0"
                           />
                         </div>
@@ -667,56 +688,24 @@ export default function RegistrarVenta() {
                       <button
                         type="button"
                         onClick={() => handleRemoveDetail(index)}
-                        className="text-red-600 hover:text-red-800 transition duration-300"
+                        className="text-red-600 hover:text-red-800 transition duration-300 flex items-center"
                       >
-                        <Minus size={20} />
+                        <Minus size={20} className="mr-1" />
+                        <span>Eliminar servicio</span>
                       </button>
                     )}
-                  </div>
+                  </motion.div>
                 ))}
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   type="button"
                   onClick={handleAddDetail}
-                  className="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition duration-300 flex items-center justify-center"
+                  className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300"
                 >
-                  <Plus size={20} className="mr-2" /> Agregar otro servicio
-                </button>
-                <div>
-                  <label htmlFor="tipoPago" className="block text-sm font-medium text-gray-700 mb-1">Tipo de Pago</label>
-                  <select
-                    id="tipoPago"
-                    name="tipoPago"
-                    value={saleFormData.tipoPago}
-                    onChange={handleSaleInputChange}
-                    required
-                    className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                  >
-                    <option value="">Seleccione un tipo de pago</option>
-                    {tiposPago.map((tipo) => (
-                      <option key={tipo.id_tipo_pago} value={tipo.id_tipo_pago}>
-                        {tipo.name_comision}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="abono" className="block text-sm font-medium text-gray-700 mb-1">Abono</label>
-                  <div className="relative">
-                    <DollarSign className="absolute top-3 left-3 text-gray-400" size={20} />
-                    <input
-                      type="text"
-                      id="abono"
-                      name="abono"
-                      value={abono === 0 ? '' : `$${Number(abono).toLocaleString('es-CL')}`}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d]/g, '');
-                        handleSaleInputChange({ target: { name: 'abono', value } });
-                      }}
-                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                      placeholder="$0"
-                    />
-                  </div>
-                </div>
+                  <Plus size={20} className="mr-2" />
+                  Agregar otro servicio
+                </motion.button>
                 <div>
                   <label htmlFor="descripcion" className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                   <div className="relative">
@@ -727,25 +716,63 @@ export default function RegistrarVenta() {
                       value={saleFormData.descripcion}
                       onChange={handleSaleInputChange}
                       rows={3}
-                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                      placeholder="Ingrese una descripción"
+                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
+                      placeholder="Detalles adicionales de la venta"
                     ></textarea>
                   </div>
                 </div>
+                <div>
+                  <label htmlFor="tipoPago" className="block text-sm font-medium text-gray-700 mb-1">Tipo de Pago</label>
+                  <div className="relative">
+                    <DollarSign className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <select
+                      id="tipoPago"
+                      name="tipoPago"
+                      value={saleFormData.tipoPago}
+                      onChange={handleSaleInputChange}
+                      required
+                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
+                    >
+                      <option value="">Seleccione un tipo de pago</option>
+                      {tiposPago.map((tipo) => (
+                        <option key={tipo.id_tipo_pago} value={tipo.id_tipo_pago}>
+                          {tipo.name_comision}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="abono" className="block text-sm font-medium text-gray-700 mb-1">Abono</label>
+                  <div className="relative">
+                    <DollarSign className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                      type="text"
+                      id="abono"
+                      name="abono"
+                      value={abono === 0 ? '' : `$${abono.toLocaleString('es-CL')}`}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d]/g, '');
+                        handleSaleInputChange({ target: { name: 'abono', value } });
+                      }}
+                      className="pl-10 w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300 shadow-sm"
+                      placeholder="$0"
+                    />
+                  </div>
+                </div>
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center justify-center"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300"
                 >
-                  <DollarSign size={20} className="mr-2" />
                   Registrar Venta
                 </motion.button>
               </form>
             )}
             {step === 'schedule' && (
               <form onSubmit={handleScheduleSubmit} className="space-y-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-white p-4 rounded-lg shadow">
                   <div className="flex justify-between items-center mb-4">
                     <button type="button" onClick={prevMonth} className="text-purple-600 hover:text-purple-800">
                       <ChevronLeft size={24} />
@@ -757,149 +784,158 @@ export default function RegistrarVenta() {
                       <ChevronRight size={24} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-7 gap-2 text-center">
+                  <div className="grid grid-cols-7 gap-2 mb-2">
                     {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
-                      <div key={day} className="font-medium text-gray-500">{day}</div>
+                      <div key={day} className="text-center font-medium text-gray-500">
+                        {day}
+                      </div>
                     ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
                     {renderCalendar()}
                   </div>
                 </div>
-                <AnimatePresence>
-                  {showTimeModal && (
+                {showTimeModal && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                  >
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                      initial={{ scale: 0.9 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0.9 }}
+                      className="bg-white p-6 rounded-lg shadow-xl"
                     >
-                      <motion.div
-                        initial={{ y: -50 }}
-                        animate={{ y: 0 }}
-                        className="bg-white p-6 rounded-lg shadow-xl"
-                      >
-                        <h3 className="text-lg font-semibold mb-4">Seleccionar Hora</h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label htmlFor="horaInicio" className="block text-sm font-medium text-gray-700 mb-1">Hora de Inicio</label>
-                            <input
-                              type="time"
-                              id="horaInicio"
-                              name="horaInicio"
-                              value={scheduleFormData.horaInicio}
-                              onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaInicio: e.target.value }))}
-                              required
-                              className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="horaFin" className="block text-sm font-medium text-gray-700 mb-1">Hora de Fin</label>
-                            <input
-                              type="time"
-                              id="horaFin"
-                              name="horaFin"
-                              value={scheduleFormData.horaFin}
-                              onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaFin: e.target.value }))}
-                              required
-                              className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 transition duration-300"
-                            />
-                          </div>
+                      <h3 className="text-lg font-semibold mb-4">Seleccionar Hora</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="horaInicio" className="block text-sm font-medium text-gray-700 mb-1">Hora de Inicio</label>
+                          <input
+                            type="time"
+                            id="horaInicio"
+                            name="horaInicio"
+                            value={scheduleFormData.horaInicio}
+                            onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaInicio: e.target.value }))}
+                            required
+                            className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500"
+                          />
                         </div>
-                        <div className="mt-6 flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={() => setShowTimeModal(false)}
-                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-300"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleTimeSelection}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-300"
-                          >
-                            Confirmar
-                          </button>
+                        <div>
+                          <label htmlFor="horaFin" className="block text-sm font-medium text-gray-700 mb-1">Hora de Fin</label>
+                          <input
+                            type="time"
+                            id="horaFin"
+                            name="horaFin"
+                            value={scheduleFormData.horaFin}
+                            onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaFin: e.target.value }))}
+                            required
+                            className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500"
+                          />
                         </div>
-                      </motion.div>
+                      </div>
+                      <div className="mt-6 flex justify-end space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowTimeModal(false)}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTimeSelection}
+                          className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                        >
+                          Confirmar
+                        </button>
+                      </div>
                     </motion.div>
-                  )}
-                </AnimatePresence>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha y Hora Seleccionadas</label>
-                  <div className="bg-gray-100 p-4 rounded-lg">
-                    <p className="text-lg font-semibold">
-                      {scheduleFormData.fechaServicio.toLocaleDateString()} - {scheduleFormData.horaInicio} a {scheduleFormData.horaFin}
-                    </p>
-                  </div>
-                </div>
+                  </motion.div>
+                )}
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center justify-center"
+                  className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300"
                 >
-                  <Calendar size={20} className="mr-2" />
+                  <Calendar className="mr-2" size={20} />
                   Agendar Cita
                 </motion.button>
               </form>
             )}
             {step === 'summary' && saleSummary && (
-              <div className="space-y-6">
-                <div className="bg-gray-100 p-6 rounded-lg">
-                  <h3 className="text-xl font-semibold mb-4">Resumen de la Venta y Cita</h3>
-                  <div className="space-y-2">
-                    <p><span className="font-medium">Cliente:</span> {saleSummary.clientName}</p>
-                    <p><span className="font-medium">RUT:</span> {saleSummary.rut}</p>
-                    <p><span className="font-medium">Servicios:</span></p>
-                    <ul className="list-disc list-inside pl-4">
-                      {saleSummary.servicios.map((servicio, index) => (
-                        <li key={index}>
-                          {servicio.nombre} - Cantidad: {servicio.cantidad}, Precio: ${servicio.precio.toLocaleString('es-CL')}
-                        </li>
-                      ))}
-                    </ul>
-                    <p><span className="font-medium">Fecha:</span> {saleSummary.date}</p>
-                    <p><span className="font-medium">Hora:</span> {saleSummary.startTime} - {saleSummary.endTime}</p>
-                    <p><span className="font-medium">Total:</span> ${saleSummary.total.toLocaleString('es-CL')} CLP</p>
-                    <p><span className="font-medium">Tipo de Pago:</span> {saleSummary.tipoPago}</p>
-                    <p><span className="font-medium">Abono:</span> ${saleSummary.abono.toLocaleString('es-CL')} CLP</p>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="space-y-6"
+              >
+                <div className="bg-purple-50 p-6 rounded-lg shadow-md">
+                  <h3 className="text-xl font-semibold mb-4 text-purple-800">Resumen de la Venta y Cita</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Cliente</p>
+                      <p className="text-lg font-semibold">{saleSummary.clientName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">RUT</p>
+                      <p className="text-lg">{saleSummary.rut}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Servicios</p>
+                      <ul className="list-disc list-inside">
+                        {saleSummary.servicios.map((servicio, index) => (
+                          <li key={index} className="text-lg">
+                            {servicio.nombre} - {servicio.cantidad} x ${servicio.precio.toLocaleString('es-CL')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Fecha de la Cita</p>
+                      <p className="text-lg">{saleSummary.date}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Horario</p>
+                      <p className="text-lg">{saleSummary.startTime} - {saleSummary.endTime}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Total</p>
+                      <p className="text-xl font-bold">${saleSummary.total.toLocaleString('es-CL')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Tipo de Pago</p>
+                      <p className="text-lg">{saleSummary.tipoPago}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Abono</p>
+                      <p className="text-lg font-semibold">${saleSummary.abono.toLocaleString('es-CL')}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="flex space-x-4">
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleVolverAlMenu}
-                    className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition duration-300 flex items-center justify-center"
+                    className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 flex items-center justify-center"
                   >
+                    <Home className="mr-2" size={20} />
                     Volver al Menú
                   </motion.button>
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      setSaleFormData({
-                        rut: '',
-                        detalles: [{ servicioId: '', cantidad: '', precio: '' }],
-                        descripcion: '',
-                        tipoPago: '',
-                        servicioId: ''
-                      })
-                      setScheduleFormData({
-                        fechaServicio: new Date(),
-                        horaInicio: '',
-                        horaFin: ''
-                      })
-                      setAbono(0)
-                      setStep('sale')
-                      setMensaje(null)
-                    }}
-                    className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-300 flex items-center justify-center"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleNuevaVenta}
+                    className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300 flex items-center justify-center"
                   >
+                    <PlusCircle className="mr-2" size={20} />
                     Nueva Venta
                   </motion.button>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
         </motion.div>

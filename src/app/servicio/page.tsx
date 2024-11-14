@@ -43,10 +43,10 @@ function Header() {
       </div>
       
       <div className="flex items-center space-x-4">
-        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors">
-            <Home size={24} />
-            <span className="sr-only">Volver a la página principal</span>
-          </Link>
+      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
       </div>
     </motion.header>
   )

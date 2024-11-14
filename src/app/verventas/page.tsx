@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import supabase from "../../../lib/supabaseClient"
+import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import Image from 'next/image'
+import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Menu, LogOut, Search, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
+import { Home, Search, Edit, Trash2, Eye, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react'
 
 type Venta = {
   id: number
@@ -18,17 +19,25 @@ type Venta = {
   service_name: string
   is_active: boolean
   next_appointment: string | null
+  total_paid: number
+  appointment_count: number
+  id_tipo_pago: number
+  tipo_pago?: TipoPago
 }
 
-type NewAppointment = {
-  venta_id: number
-  service_date: string
-  start_time: string
-  end_time: string
-  description: string
+type NewPayment = {
+  ventas_id_venta: number
+  amount: number
+}
+
+type TipoPago = {
+  id_tipo_pago: number
+  name_comision: string
+  porcentaje: number
 }
 
 type Cita = {
+  id: number
   service_date: string
   start_time: string
 }
@@ -36,59 +45,82 @@ type Cita = {
 export default function VentasActivas() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null)
-  const [newAppointment, setNewAppointment] = useState<NewAppointment>({
-    venta_id: 0,
-    service_date: '',
-    start_time: '',
-    end_time: '',
-    description: ''
+  const [newPayment, setNewPayment] = useState<NewPayment>({
+    ventas_id_venta: 0,
+    amount: 0
   })
+  
   const ventasPorPagina = 10
+  
 
   useEffect(() => {
     fetchVentas()
+    
   }, [])
 
   const fetchVentas = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('ventas')
-      .select(`
-        *,
-        clients(name),
-        users(name),
-        servicios(name_servicio),
-        citas(service_date, start_time)
-      `)
+    setError(null)
+    try {
+      const { data, error } = await supabase
+        .from('ventas')
+        .select(`
+          *,
+          clients (name),
+          users (name),
+          servicios (name_servicio),
+          citas (id, service_date, start_time),
+          abono (cantidad_abonada),
+          tipo_pago (id_tipo_pago, name_comision, porcentaje)
+        `)
 
-    if (error) {
-      console.error('Error fetching ventas:', error)
-    } else if (data) {
-      const ventasFormateadas = data.map(venta => {
-        const futureCitas = (venta.citas as Cita[]).filter((cita) => {
-          const citaDateTime = new Date(`${cita.service_date}T${cita.start_time}`)
-          return citaDateTime > new Date()
-        }).sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
+      if (error) {
+        console.error('Supabase error:', error)
+        throw new Error(`Error fetching ventas: ${error.message}`)
+      }
 
-        return {
-          ...venta,
-          client_name: venta.clients?.name || 'Cliente desconocido',
-          worker_name: venta.users?.name || 'Trabajador desconocido',
-          service_name: venta.servicios?.name_servicio || 'Servicio desconocido',
-          is_active: futureCitas.length > 0,
-          next_appointment: futureCitas.length > 0 ? `${futureCitas[0].service_date} ${futureCitas[0].start_time}` : null
-        }
-      })
+      if (!data) {
+        throw new Error('No data returned from Supabase')
+      }
+
+      const ventasFormateadas = data
+        .filter(venta => venta.tipo_pago !== null)
+        .map(venta => {
+          const totalPaid = venta.abono ? venta.abono.reduce((sum: number, abono: { cantidad_abonada: number }) => sum + abono.cantidad_abonada, 0) : 0
+          const futureCitas = (venta.citas as Cita[])
+            .filter(cita => new Date(`${cita.service_date}T${cita.start_time}`) > new Date())
+            .sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
+          
+          return {
+            ...venta,
+            client_name: venta.clients?.name || 'Cliente desconocido',
+            worker_name: venta.users?.name || 'Trabajador desconocido',
+            service_name: venta.servicios?.name_servicio || 'Servicio desconocido',
+            is_active: futureCitas.length > 0,
+            next_appointment: futureCitas.length > 0 ? `${futureCitas[0].service_date} ${futureCitas[0].start_time}` : null,
+            total_paid: totalPaid,
+            appointment_count: venta.citas ? venta.citas.length : 0,
+            id_tipo_pago: venta.tipo_pago?.id_tipo_pago,
+            tipo_pago: venta.tipo_pago
+          }
+        })
       setVentas(ventasFormateadas)
+    } catch (error) {
+      console.error('Error in fetchVentas:', error)
+      setError(error instanceof Error ? error.message : 'An unknown error occurred')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+
+
 
   const handleEditVenta = (venta: Venta) => {
     setSelectedVenta(venta)
@@ -99,21 +131,24 @@ export default function VentasActivas() {
     e.preventDefault()
     if (!selectedVenta) return
 
-    const { error } = await supabase
-      .from('ventas')
-      .update({
-        price: selectedVenta.price,
-        description: selectedVenta.description
-      })
-      .eq('id', selectedVenta.id)
+    try {
+      const { error } = await supabase
+        .from('ventas')
+        .update({
+          price: selectedVenta.price,
+          description: selectedVenta.description,
+          id_tipo_pago: selectedVenta.id_tipo_pago
+        })
+        .eq('id', selectedVenta.id)
 
-    if (error) {
-      console.error('Error updating venta:', error)
-      alert('Hubo un error al actualizar la venta. Por favor, inténtalo de nuevo.')
-    } else {
+      if (error) throw error
+
       setShowEditModal(false)
       fetchVentas()
       alert('Venta actualizada con éxito.')
+    } catch (error) {
+      console.error('Error updating venta:', error)
+      alert('Hubo un error al actualizar la venta. Por favor, inténtalo de nuevo.')
     }
   }
 
@@ -121,17 +156,19 @@ export default function VentasActivas() {
     const isConfirmed = window.confirm('¿Estás seguro de que quieres eliminar esta venta?')
     
     if (isConfirmed) {
-      const { error } = await supabase
-        .from('ventas')
-        .delete()
-        .eq('id', id)
+      try {
+        const { error } = await supabase
+          .from('ventas')
+          .delete()
+          .eq('id', id)
 
-      if (error) {
-        console.error('Error deleting venta:', error)
-        alert('Hubo un error al eliminar la venta. Por favor, inténtalo de nuevo.')
-      } else {
+        if (error) throw error
+
         fetchVentas()
         alert('Venta eliminada con éxito.')
+      } catch (error) {
+        console.error('Error deleting venta:', error)
+        alert('Hubo un error al eliminar la venta. Por favor, inténtalo de nuevo.')
       }
     }
   }
@@ -141,35 +178,84 @@ export default function VentasActivas() {
     setShowDetailsModal(true)
   }
 
-  const handleAddAppointment = (id: number) => {
-    setNewAppointment({ ...newAppointment, venta_id: id })
-    setShowNewAppointmentModal(true)
+  const handleAddPayment = (venta: Venta) => {
+    setSelectedVenta(venta)
+    setNewPayment({ ventas_id_venta: venta.id, amount: 0 })
+    setShowPaymentModal(true)
   }
 
-  const handleNewAppointmentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewPaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setNewAppointment(prev => ({ ...prev, [name]: value }))
+    const numericValue = parseFloat(value)
+    setNewPayment(prev => ({
+      ...prev,
+      [name]: isNaN(numericValue) ? 0 : numericValue
+    }))
   }
 
-  const handleNewAppointmentSubmit = async (e: React.FormEvent) => {
+  const handleNewPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { error } = await supabase
-      .from('citas')
-      .insert({
-        venta_id: newAppointment.venta_id,
-        service_date: newAppointment.service_date,
-        start_time: newAppointment.start_time,
-        end_time: newAppointment.end_time,
-        description: newAppointment.description
-      })
+    if (!selectedVenta) return
 
-    if (error) {
-      console.error('Error adding new appointment:', error)
-      alert('Hubo un error al agregar la cita. Por favor, inténtalo de nuevo.')
-    } else {
-      setShowNewAppointmentModal(false)
+    const remainingAmount = selectedVenta.price - selectedVenta.total_paid
+    if (newPayment.amount > remainingAmount) {
+      alert(`El pago no puede exceder el monto restante de ${formatCurrency(remainingAmount)}`)
+      return
+    }
+
+    try {
+      const { data: abonoData, error: abonoError } = await supabase
+        .from('abono')
+        .insert({
+          ventas_id_venta: newPayment.ventas_id_venta,
+          cantidad_abonada: newPayment.amount,
+          fecha_abono: new Date().toISOString(),
+          id_tipo_pago: selectedVenta.tipo_pago?.id_tipo_pago
+        })
+        .select()
+
+      if (abonoError) {
+        console.error('Error inserting abono:', abonoError)
+        throw abonoError
+      }
+
+      console.log('Abono inserted successfully:', abonoData)
+
+      if (!selectedVenta.tipo_pago) {
+        console.error('Tipo de pago not found for venta:', selectedVenta)
+        alert('Error: Tipo de pago no encontrado para esta venta. Por favor, actualice la venta con un tipo de pago válido.')
+        return
+      }
+
+      const tipoPago = selectedVenta.tipo_pago
+      const montoConPorcentajeTipoPago = newPayment.amount * (1 - tipoPago.porcentaje / 100)
+      const comision = Math.round(montoConPorcentajeTipoPago * 0.1)
+
+      console.log('Calculated commission:', comision)
+
+      const { data: comisionData, error: comisionError } = await supabase
+        .from('comision')
+        .insert({
+          ventas_id_venta: selectedVenta.id,
+          empleado_id_empleado: selectedVenta.worker_id_integer,
+          monto_comision: comision,
+          fecha_comision: new Date().toISOString()
+        })
+        .select()
+
+      if (comisionError) {
+        console.error('Error inserting comision:', comisionError)
+        throw comisionError
+      }
+
+      console.log('Comision inserted successfully:', comisionData)
+
+      setShowPaymentModal(false)
       fetchVentas()
-      alert('Cita agregada con éxito.')
+      alert('Pago y comisión agregados con éxito.')
+    } catch (error) {
+      console.error('Error adding new payment and commission:', error)
+      alert('Hubo un error al agregar el pago y la comisión. Por favor, inténtalo de nuevo.')
     }
   }
 
@@ -182,64 +268,77 @@ export default function VentasActivas() {
   const ventasActivas = ventasFiltradas.filter(venta => venta.is_active)
   const ventasInactivas = ventasFiltradas.filter(venta => !venta.is_active)
 
-  const indexOfLastVenta = currentPage * ventasPorPagina
-  const indexOfFirstVenta = indexOfLastVenta - ventasPorPagina
+  const indexOfLastVentaActiva = currentPage * ventasPorPagina
+  const indexOfFirstVentaActiva = indexOfLastVentaActiva - ventasPorPagina
+
+  const indexOfLastVentaInactiva = currentPage * ventasPorPagina
+  const indexOfFirstVentaInactiva = indexOfLastVentaInactiva - ventasPorPagina
 
   const pageNumbers = []
   for (let i = 1; i <= Math.ceil((ventasActivas.length + ventasInactivas.length) / ventasPorPagina); i++) {
     pageNumbers.push(i)
   }
 
-  const renderVentasTable = (ventas: Venta[], title: string) => (
-    <div className="mb-8">
-      <h3 className="text-2xl font-bold mb-4">{title}</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trabajador</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Cita</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+  const formatCurrency = (amount: number) => {
+    return amount.toLocaleString('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    })
+  }
+
+  const renderVentasTable = (ventas: Venta[]) => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trabajador</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pagado</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Citas</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Cita</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {ventas.map((venta) => (
+            <tr key={venta.id}>
+              <td className="px-6 py-4 whitespace-nowrap">{venta.client_name}</td>
+              <td className="px-6 py-4 whitespace-nowrap">{venta.worker_name}</td>
+              <td className="px-6 py-4 whitespace-nowrap">{venta.service_name}</td>
+              <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(venta.price)}</td>
+              <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(venta.total_paid)}</td>
+              <td className="px-6 py-4 whitespace-nowrap">{venta.appointment_count}</td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                {venta.next_appointment 
+                  ? new Date(venta.next_appointment).toLocaleString()
+                  : 'No hay citas futuras'}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button onClick={() => handleViewDetails(venta)} className="text-indigo-600 hover:text-indigo-900 mr-2">
+                  <Eye size={20} />
+                </button>
+                <button onClick={() => handleEditVenta(venta)} className="text-yellow-600 hover:text-yellow-900 mr-2">
+                  <Edit size={20} />
+                </button>
+                <button onClick={() => handleDeleteVenta(venta.id)} className="text-red-600 hover:text-red-900 mr-2">
+                  <Trash2 size={20} />
+                </button>
+                <button 
+                  onClick={() => handleAddPayment(venta)} 
+                  className="text-green-600 hover:text-green-900 flex items-center"
+                >
+                  <DollarSign size={20} className="mr-1" />
+                  <span>Abonar</span>
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {ventas.map((venta) => (
-              <tr key={venta.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{venta.client_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{venta.worker_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{venta.service_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">${venta.price}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {venta.next_appointment 
-                    ? new Date(venta.next_appointment).toLocaleString()
-                    : 'No hay citas futuras'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button onClick={() => handleViewDetails(venta)} className="text-indigo-600 hover:text-indigo-900 mr-2">
-                    <Eye size={20} />
-                  </button>
-                  <button onClick={() => handleEditVenta(venta)} className="text-yellow-600 hover:text-yellow-900 mr-2">
-                    <Edit size={20} />
-                  </button>
-                  <button onClick={() => handleDeleteVenta(venta.id)} className="text-red-600 hover:text-red-900 mr-2">
-                    <Trash2 size={20} />
-                  </button>
-                  <button 
-                    onClick={() => handleAddAppointment(venta.id)} 
-                    className="text-green-600 hover:text-green-900 flex items-center"
-                  >
-                    <Calendar size={20} className="mr-1" />
-                    <span>Agregar Cita</span>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 
@@ -251,6 +350,23 @@ export default function VentasActivas() {
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full"
         />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700">{error}</p>
+          <button 
+            onClick={fetchVentas} 
+            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
       </div>
     )
   }
@@ -282,15 +398,10 @@ export default function VentasActivas() {
             </motion.span>
           </div>
           <div className="flex items-center space-x-4">
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <Bell size={24} />
-            </button>
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <Menu size={24} />
-            </button>
-            <button className="text-white hover:text-gray-200 transition-colors">
-              <LogOut size={24} />
-            </button>
+          <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
           </div>
         </motion.header>
 
@@ -315,18 +426,33 @@ export default function VentasActivas() {
               </div>
             </div>
 
-            {renderVentasTable(ventasActivas.slice(indexOfFirstVenta, indexOfLastVenta), "Ventas Activas")}
-            {renderVentasTable(ventasInactivas.slice(indexOfFirstVenta, indexOfLastVenta), "Ventas Inactivas")}
+            {ventasActivas.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-2xl font-bold mb-4 text-green-600">Ventas con Citas Pendientes</h3>
+                {renderVentasTable(ventasActivas.slice(indexOfFirstVentaActiva, indexOfLastVentaActiva))}
+              </div>
+            )}
+
+            {ventasInactivas.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-2xl font-bold mb-4 text-gray-600">Ventas sin Citas Pendientes</h3>
+                {renderVentasTable(ventasInactivas.slice(indexOfFirstVentaInactiva, indexOfLastVentaInactiva))}
+              </div>
+            )}
 
             <div className="mt-6 flex justify-between items-center">
               <div>
                 <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{indexOfFirstVenta + 1}</span> a <span className="font-medium">{Math.min(indexOfLastVenta, ventasActivas.length + ventasInactivas.length)}</span> de <span className="font-medium">{ventasActivas.length + ventasInactivas.length}</span> resultados
+                  Mostrando <span className="font-medium">{indexOfFirstVentaActiva + 1}</span> a{' '}
+                  <span className="font-medium">
+                    {Math.min(indexOfLastVentaActiva, ventasActivas.length + ventasInactivas.length)}
+                  </span>{' '}
+                  de <span className="font-medium">{ventasActivas.length + ventasInactivas.length}</span> resultados
                 </p>
               </div>
               <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
-                  onClick={()=> setCurrentPage(prev =>   Math.max(prev - 1, 1))}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
                   <span className="sr-only">Previous</span>
@@ -357,92 +483,6 @@ export default function VentasActivas() {
       </div>
 
       <AnimatePresence>
-        {showNewAppointmentModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-lg p-6 w-full max-w-md"
-            >
-              <h3 className="text-lg font-medium mb-4">Agregar Nueva Cita</h3>
-              <form onSubmit={handleNewAppointmentSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="service_date" className="block text-sm font-medium text-gray-700">Fecha del Servicio</label>
-                  <input
-                    type="date"
-                    id="service_date"
-                    name="service_date"
-                    required
-                    value={newAppointment.service_date}
-                    onChange={handleNewAppointmentChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">Hora de Inicio</label>
-                  <input
-                    type="time"
-                    id="start_time"
-                    name="start_time"
-                    required
-                    value={newAppointment.start_time}
-                    onChange={handleNewAppointmentChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="end_time" className="block text-sm font-medium text-gray-700">Hora de Fin</label>
-                  <input
-                    type="time"
-                    id="end_time"
-                    name="end_time"
-                    required
-                    value={newAppointment.end_time}
-                    onChange={handleNewAppointmentChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700">Descripción</label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    required
-                    value={newAppointment.description}
-                    onChange={handleNewAppointmentChange}
-                    rows={3}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Ingrese una descripción para la cita"
-                  ></textarea>
-                </div>
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowNewAppointmentModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Agregar Cita
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {showDetailsModal && selectedVenta && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -461,9 +501,13 @@ export default function VentasActivas() {
                 <p><span className="font-medium">Cliente:</span> {selectedVenta.client_name}</p>
                 <p><span className="font-medium">Trabajador:</span> {selectedVenta.worker_name}</p>
                 <p><span className="font-medium">Servicio:</span> {selectedVenta.service_name}</p>
-                <p><span className="font-medium">Precio:</span> ${selectedVenta.price}</p>
+                <p><span className="font-medium">Precio:</span> {formatCurrency(selectedVenta.price)}</p>
+                <p><span className="font-medium">Total Pagado:</span> {formatCurrency(selectedVenta.total_paid)}</p>
+                <p><span className="font-medium">Restante:</span> {formatCurrency(selectedVenta.price - selectedVenta.total_paid)}</p>
+                <p><span className="font-medium">Número de Citas:</span> {selectedVenta.appointment_count}</p>
                 <p><span className="font-medium">Descripción:</span> {selectedVenta.description}</p>
                 <p><span className="font-medium">Próxima Cita:</span> {selectedVenta.next_appointment ? new Date(selectedVenta.next_appointment).toLocaleString() : 'No hay citas futuras'}</p>
+                <p><span className="font-medium">Tipo de Pago:</span> {selectedVenta.tipo_pago ? selectedVenta.tipo_pago.name_comision : 'No especificado'}</p>
               </div>
               <div className="mt-6 flex justify-end">
                 <button
@@ -527,6 +571,61 @@ export default function VentasActivas() {
                     className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPaymentModal && selectedVenta && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-lg p-6 w-full max-w-md"
+            >
+              <h3 className="text-lg font-medium mb-4">Agregar Pago</h3>
+              <form onSubmit={handleNewPaymentSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Monto del Pago</label>
+                  <input
+                    type="number"
+                    id="amount"
+                    name="amount"
+                    value={newPayment.amount.toString()}
+                    onChange={handleNewPaymentChange}
+                    min="0"
+                    step="1"
+                    max={selectedVenta.price - selectedVenta.total_paid}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    required
+                  />
+                </div>
+                <p className="text-sm text-gray-500">
+                  Monto restante: {formatCurrency(selectedVenta.price - selectedVenta.total_paid)}
+                </p>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Agregar Pago
                   </button>
                 </div>
               </form>

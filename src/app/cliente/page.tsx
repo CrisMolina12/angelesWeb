@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import supabase from '../../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Menu, LogOut, UserPlus, Phone, CreditCard, Check, X } from 'lucide-react'
+import { UserPlus, Phone, CreditCard, Check, X, Home } from 'lucide-react'
+import supabase from '../../../lib/supabaseClient'
+import Link from 'next/link'
 
 function Header() {
   return (
@@ -33,15 +34,10 @@ function Header() {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Bell size={24} />
-        </button>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Menu size={24} />
-        </button>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <LogOut size={24} />
-        </button>
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
       </div>
     </motion.header>
   )
@@ -51,7 +47,7 @@ export default function RegisterClient() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [rut, setRut] = useState('')
-  const [role, setRole] = useState(null)
+  const [role, setRole] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const router = useRouter()
 
@@ -85,6 +81,32 @@ export default function RegisterClient() {
 
     checkUserRole()
   }, [router])
+
+  const formatRut = (value: string) => {
+    const cleaned = value.replace(/[^0-9Kk]/g, '')
+    const match = cleaned.match(/^(\d{1,2})(\d{3})(\d{3})([0-9Kk])?$/)
+    if (match) {
+      const formatted = `${match[1]}.${match[2]}.${match[3]}${match[4] ? `-${match[4]}` : ''}`
+      return formatted.slice(0, 12)
+    }
+    return cleaned
+  }
+
+  const formatPhone = (value: string) => {
+    const cleaned = value.replace(/\D/g, '')
+    const limited = cleaned.slice(0, 9)
+    let formatted = ''
+    if (limited.length > 0) {
+      formatted += limited.slice(0, 1)
+      if (limited.length > 1) {
+        formatted += ' ' + limited.slice(1, 5)
+        if (limited.length > 5) {
+          formatted += ' ' + limited.slice(5)
+        }
+      }
+    }
+    return formatted
+  }
 
   const handleRegisterClient = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -197,9 +219,11 @@ export default function RegisterClient() {
                       type="text"
                       required
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                       className="appearance-none block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm transition duration-150 ease-in-out"
                       placeholder="Nombre completo"
+                      pattern="[A-Za-z\s]+"
+                      title="Por favor, ingrese solo letras y espacios"
                     />
                   </div>
                 </div>
@@ -218,9 +242,10 @@ export default function RegisterClient() {
                       type="tel"
                       required
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => setPhone(formatPhone(e.target.value))}
                       className="appearance-none block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm transition duration-150 ease-in-out"
-                      placeholder="+56 9 1234 5678"
+                      placeholder="9 1234 5678"
+                      maxLength={11}
                     />
                   </div>
                 </div>
@@ -239,9 +264,10 @@ export default function RegisterClient() {
                       type="text"
                       required
                       value={rut}
-                      onChange={(e) => setRut(e.target.value)}
+                      onChange={(e) => setRut(formatRut(e.target.value))}
                       className="appearance-none block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm transition duration-150 ease-in-out"
                       placeholder="12.345.678-9"
+                      maxLength={12}
                     />
                   </div>
                 </div>

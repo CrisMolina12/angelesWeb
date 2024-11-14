@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '../../../lib/supabaseClient'
-import { LogOut, Bell, Menu } from 'lucide-react'
+import { LogOut, Home } from 'lucide-react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 
 function Header() {
   return (
@@ -33,12 +34,10 @@ function Header() {
         </motion.span>
       </div>
       <div className="flex items-center space-x-2">
-        <button className="text-white hover:text-gray-200 transition-colors p-1">
-          <Bell size={25} />
-        </button>
-        <button className="text-white hover:text-gray-200 transition-colors p-1">
-          <Menu size={20} />
-        </button>
+      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
       </div>
     </motion.header>
   )

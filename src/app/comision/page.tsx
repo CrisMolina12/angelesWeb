@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import supabase from "../../../lib/supabaseClient"
 import { motion } from 'framer-motion'
-import { Edit, Trash2, ChevronDown, ChevronUp, Bell, Menu, LogOut, Home } from 'lucide-react'
+import { Edit, Trash2, ChevronDown, ChevronUp, Home } from 'lucide-react'
 
 type Abono = {
   id: number
@@ -24,6 +24,15 @@ type Comision = {
   venta_total?: number
   tipo_pago?: string
   porcentaje_comision?: number
+}
+
+type VentaAgrupada = {
+  ventas_id_venta: number
+  venta_total: number
+  tipo_pago: string
+  porcentaje_comision: number
+  empleado_name: string
+  comisiones: Comision[]
   abonos: Abono[]
 }
 
@@ -32,9 +41,7 @@ type User = {
   name: string
 }
 
-function Header({ onLogout }: { onLogout: () => void }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-
+function Header() {
   return (
     <motion.header 
       initial={{ opacity: 0, y: -50 }}
@@ -60,43 +67,18 @@ function Header({ onLogout }: { onLogout: () => void }) {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors">
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
           <Home size={24} />
-          <span className="sr-only">Volver a la página principal</span>
+          <span className="hidden sm:inline">Volver al Menú</span>
         </Link>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Bell size={24} />
-        </button>
-        <div className="relative">
-          <button 
-            className="text-white hover:text-gray-200 transition-colors"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            <Menu size={24} />
-          </button>
-          {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md overflow-hidden shadow-xl z-10">
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false)
-                  onLogout()
-                }}
-                className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-              >
-                <LogOut className="inline-block mr-2 h-4 w-4" />
-                Cerrar Sesión
-              </button>
-            </div>
-          )}
-        </div>
       </div>
     </motion.header>
   )
 }
 
 export default function ComisionesTable() {
-  const [comisiones, setComisiones] = useState<Comision[]>([])
-  const [filteredComisiones, setFilteredComisiones] = useState<Comision[]>([])
+  const [ventasAgrupadas, setVentasAgrupadas] = useState<VentaAgrupada[]>([])
+  const [filteredVentas, setFilteredVentas] = useState<VentaAgrupada[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedRows, setExpandedRows] = useState<number[]>([])
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -106,15 +88,7 @@ export default function ComisionesTable() {
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const router = useRouter()
 
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  useEffect(() => {
-    filterComisiones()
-  }, [comisiones, selectedUser, selectedMonth])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
@@ -136,7 +110,7 @@ export default function ComisionesTable() {
     setIsAdmin(true)
     fetchComisiones()
     fetchUsers()
-  }
+  }, [router])
 
   const fetchComisiones = async () => {
     try {
@@ -157,21 +131,38 @@ export default function ComisionesTable() {
       if (error) throw error
 
       if (data) {
-        const comisionesFormateadas = data.map((comision) => ({
-          id_comision: comision.id_comision,
-          ventas_id_venta: comision.ventas_id_venta,
-          empleado_id_empleado: comision.empleado_id_empleado,
-          monto_comision: comision.monto_comision,
-          fecha_comision: comision.fecha_comision,
-          empleado_name: comision.empleado?.name,
-          venta_total: comision.venta?.price,
-          tipo_pago: comision.venta?.tipo_pago?.name_comision,
-          porcentaje_comision: comision.venta?.tipo_pago?.porcentaje,
-          abonos: comision.venta?.abono || []
-        }))
+        const ventasMap = new Map<number, VentaAgrupada>()
 
-        setComisiones(comisionesFormateadas)
-        setFilteredComisiones(comisionesFormateadas)
+        data.forEach((comision) => {
+          const ventaId = comision.ventas_id_venta
+          if (!ventasMap.has(ventaId)) {
+            ventasMap.set(ventaId, {
+              ventas_id_venta: ventaId,
+              venta_total: comision.venta?.price || 0,
+              tipo_pago: comision.venta?.tipo_pago?.name_comision || '',
+              porcentaje_comision: comision.venta?.tipo_pago?.porcentaje || 0,
+              empleado_name: comision.empleado?.name || '',
+              comisiones: [],
+              abonos: comision.venta?.abono || []
+            })
+          }
+
+          ventasMap.get(ventaId)!.comisiones.push({
+            id_comision: comision.id_comision,
+            ventas_id_venta: comision.ventas_id_venta,
+            empleado_id_empleado: comision.empleado_id_empleado,
+            monto_comision: comision.monto_comision,
+            fecha_comision: comision.fecha_comision,
+            empleado_name: comision.empleado?.name,
+            venta_total: comision.venta?.price,
+            tipo_pago: comision.venta?.tipo_pago?.name_comision,
+            porcentaje_comision: comision.venta?.tipo_pago?.porcentaje,
+          })
+        })
+
+        const ventasAgrupadas = Array.from(ventasMap.values())
+        setVentasAgrupadas(ventasAgrupadas)
+        setFilteredVentas(ventasAgrupadas)
       }
     } catch (error) {
       console.error('Error al obtener las comisiones:', error)
@@ -197,22 +188,30 @@ export default function ComisionesTable() {
     }
   }
 
-  const filterComisiones = () => {
-    let filtered = [...comisiones]
+  const filterVentas = useCallback(() => {
+    let filtered = [...ventasAgrupadas]
 
     if (selectedUser) {
-      filtered = filtered.filter(comision => comision.empleado_id_empleado === selectedUser)
+      filtered = filtered.filter(venta => venta.comisiones.some(comision => comision.empleado_id_empleado === selectedUser))
     }
 
     if (selectedMonth) {
-      filtered = filtered.filter(comision => {
-        const comisionDate = new Date(comision.fecha_comision)
-        return comisionDate.getMonth() === parseInt(selectedMonth) - 1 // Months are 0-indexed
+      filtered = filtered.filter(venta => {
+        const ventaDate = new Date(venta.comisiones[0].fecha_comision)
+        return ventaDate.getMonth() === parseInt(selectedMonth) - 1 // Months are 0-indexed
       })
     }
 
-    setFilteredComisiones(filtered)
-  }
+    setFilteredVentas(filtered)
+  }, [ventasAgrupadas, selectedUser, selectedMonth])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
+  useEffect(() => {
+    filterVentas()
+  }, [filterVentas])
 
   const handleEdit = (id: number) => {
     // Implementar lógica para editar comisión
@@ -229,7 +228,13 @@ export default function ComisionesTable() {
 
         if (error) throw error
 
-        setComisiones(comisiones.filter(comision => comision.id_comision !== id))
+        // Actualizar el estado después de eliminar
+        setVentasAgrupadas(prevVentas => 
+          prevVentas.map(venta => ({
+            ...venta,
+            comisiones: venta.comisiones.filter(comision => comision.id_comision !== id)
+          })).filter(venta => venta.comisiones.length > 0)
+        )
       } catch (error) {
         console.error('Error al eliminar la comisión:', error)
       }
@@ -242,13 +247,14 @@ export default function ComisionesTable() {
     )
   }
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (!error) {
-      setIsAuthenticated(false)
-      setIsAdmin(false)
-      router.push('/login')
-    }
+  const calcularComision = (abono: number) => {
+    return (abono * 0.92) * 0.1
+  }
+
+  const calcularTotalComisiones = (venta: VentaAgrupada) => {
+    return venta.abonos.reduce((total, abono) => 
+      total + calcularComision(abono.cantidad_abonada), 0
+    )
   }
 
   if (!isAuthenticated || !isAdmin) {
@@ -270,7 +276,7 @@ export default function ComisionesTable() {
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <Header onLogout={handleLogout} />
+        <Header />
         <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
           <div className="p-6 sm:p-10">
             <h1 className="text-3xl font-bold mb-6">Tabla de Comisiones</h1>
@@ -317,53 +323,46 @@ export default function ComisionesTable() {
                 <thead className="bg-purple-600 text-white">
                   <tr>
                     <th className="py-3 px-4 text-left"></th>
-                    <th className="py-3 px-4 text-left">ID Comisión</th>
                     <th className="py-3 px-4 text-left">ID Venta</th>
                     <th className="py-3 px-4 text-left">Usuario</th>
                     <th className="py-3 px-4 text-left">Venta Total</th>
                     <th className="py-3 px-4 text-left">Tipo de Pago</th>
-                    <th className="py-3 px-4 text-left">% Comisión</th>
                     <th className="py-3 px-4 text-left">Comisión Total</th>
-                    <th className="py-3 px-4 text-left">Fecha Comisión</th>
                     <th className="py-3 px-4 text-left">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredComisiones.map((comision) => (
-                    <React.Fragment key={comision.id_comision}>
+                  {filteredVentas.map((venta) => (
+                    <React.Fragment key={venta.ventas_id_venta}>
                       <tr className="border-b hover:bg-gray-100">
                         <td className="py-3 px-4">
-                          <button onClick={() => toggleRowExpansion(comision.id_comision)}>
-                            {expandedRows.includes(comision.id_comision) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                          <button onClick={() => toggleRowExpansion(venta.ventas_id_venta)}>
+                            {expandedRows.includes(venta.ventas_id_venta) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                           </button>
                         </td>
-                        <td className="py-3 px-4">{comision.id_comision}</td>
-                        <td className="py-3 px-4">{comision.ventas_id_venta}</td>
-                        <td className="py-3 px-4">{comision.empleado_name}</td>
-                        <td className="py-3 px-4">${comision.venta_total?.toLocaleString('es-CL')}</td>
-                        <td className="py-3 px-4">{comision.tipo_pago}</td>
-                        <td className="py-3 px-4">{comision.porcentaje_comision}%</td>
-                        <td className="py-3 px-4">${comision.monto_comision.toLocaleString('es-CL')}</td>
-                        <td className="py-3 px-4">{new Date(comision.fecha_comision).toLocaleDateString()}</td>
+                        <td className="py-3 px-4">{venta.ventas_id_venta}</td>
+                        <td className="py-3 px-4">{venta.empleado_name}</td>
+                        <td className="py-3 px-4">${venta.venta_total.toLocaleString('es-CL')}</td>
+                        <td className="py-3 px-4">{venta.tipo_pago}</td>
+                        <td className="py-3 px-4">${calcularTotalComisiones(venta).toLocaleString('es-CL')}</td>
                         <td className="py-3 px-4">
                           <button
-                            onClick={() => handleEdit(comision.id_comision)}
+                            onClick={() => handleEdit(venta.ventas_id_venta)}
                             className="text-blue-600 hover:text-blue-800 mr-2"
                           >
                             <Edit size={18} />
-                          
                           </button>
                           <button
-                            onClick={() => handleDelete(comision.id_comision)}
+                            onClick={() => handleDelete(venta.ventas_id_venta)}
                             className="text-red-600 hover:text-red-800"
                           >
                             <Trash2 size={18} />
                           </button>
                         </td>
                       </tr>
-                      {expandedRows.includes(comision.id_comision) && (
+                      {expandedRows.includes(venta.ventas_id_venta) && (
                         <tr>
-                          <td colSpan={10}>
+                          <td colSpan={7}>
                             <div className="p-4 bg-gray-50">
                               <h4 className="font-semibold mb-2">Abonos:</h4>
                               <table className="w-full">
@@ -372,14 +371,18 @@ export default function ComisionesTable() {
                                     <th className="py-2 px-4 text-left">ID Abono</th>
                                     <th className="py-2 px-4 text-left">Cantidad Abonada</th>
                                     <th className="py-2 px-4 text-left">Fecha Abono</th>
+                                    <th className="py-2 px-4 text-left">Comisión</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {comision.abonos.map((abono) => (
+                                  {venta.abonos.map((abono) => (
                                     <tr key={abono.id}>
                                       <td className="py-2 px-4">{abono.id}</td>
                                       <td className="py-2 px-4">${abono.cantidad_abonada.toLocaleString('es-CL')}</td>
                                       <td className="py-2 px-4">{new Date(abono.fecha_abono).toLocaleDateString()}</td>
+                                      <td className="py-2 px-4">
+                                        ${calcularComision(abono.cantidad_abonada).toLocaleString('es-CL')}
+                                      </td>
                                     </tr>
                                   ))}
                                 </tbody>

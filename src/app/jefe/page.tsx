@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Calendar, DollarSign, UserPlus, BarChart2, FileText, LogOut, Bell, Menu, Briefcase, Eye, Clock } from 'lucide-react'
+import { Users, Calendar, DollarSign, UserPlus, BarChart2, FileText, LogOut,  Menu, Briefcase, Eye, Clock } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -35,9 +35,6 @@ function Header({ onLogout }: { onLogout: () => void }) {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Bell size={24} />
-        </button>
         <div className="relative">
           <button 
             className="text-white hover:text-gray-200 transition-colors"

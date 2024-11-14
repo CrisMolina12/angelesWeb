@@ -5,15 +5,16 @@ import { Bar, Line, Pie } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
 import supabase from '../../../lib/supabaseClient'
 import { motion } from 'framer-motion'
-import { DollarSign, TrendingUp, Users,  CreditCard, Home } from 'lucide-react'
+import { DollarSign, TrendingUp, Users, CreditCard, Home } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend)
 
 function Header() {
   return (
-    <header className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-lg shadow-md mb-6 mx-auto max-w-7xl">
+    <header className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-lg shadow-lg mb-8 mx-auto max-w-7xl">
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-3">
           <div className="bg-white rounded-full p-1">
@@ -27,10 +28,12 @@ function Header() {
           </div>
           <h1 className="text-xl font-bold text-white">Angeles - Informes de Negocio</h1>
         </div>
-        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors">
-            <Home size={24} />
-            <span className="sr-only">Volver a la página principal</span>
-          </Link>
+        <div className="flex items-center space-x-4">
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
+        </div>
       </div>
     </header>
   )
@@ -41,6 +44,7 @@ type Venta = {
   price: number
   worker_id: string | null
   worker_id_integer: number | null
+  servicio_id: string
 }
 
 type Abono = {
@@ -61,53 +65,97 @@ type Trabajador = {
   name: string
 }
 
+type Servicio = {
+  id: number
+  name_servicio: string
+}
+
 export default function InformesNegocio() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [abonos, setAbonos] = useState<Abono[]>([])
   const [citas, setCitas] = useState<Cita[]>([])
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
+  const [servicios, setServicios] = useState<Servicio[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
-    const obtenerDatos = async () => {
-      try {
-        const { data: datosVentas, error: errorVentas } = await supabase
-          .from('ventas')
-          .select('*')
-          .order('id', { ascending: true })
-        if (errorVentas) throw errorVentas
-
-        const { data: datosAbonos, error: errorAbonos } = await supabase
-          .from('abono')
-          .select('*')
-          .order('fecha_abono', { ascending: true })
-        if (errorAbonos) throw errorAbonos
-
-        const { data: datosCitas, error: errorCitas } = await supabase
-          .from('citas')
-          .select('*')
-        if (errorCitas) throw errorCitas
-
-        const { data: datosTrabajadores, error: errorTrabajadores } = await supabase
-          .from('users')
-          .select('id, name')
-        if (errorTrabajadores) throw errorTrabajadores
-
-        setVentas(datosVentas)
-        setAbonos(datosAbonos)
-        setCitas(datosCitas)
-        setTrabajadores(datosTrabajadores)
-      } catch (err) {
-        setError('Error al obtener los datos. Por favor, inténtelo de nuevo más tarde.')
-        console.error(err)
-      } finally {
-        setCargando(false)
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
       }
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('email', session.user.email)
+        .single()
+
+      if (userError || !userData) {
+        setError('Error al verificar los permisos de usuario.')
+        return
+      }
+
+      if (userData.role !== 'admin') {
+        router.push('/autorizacion')
+        return
+      }
+
+      setIsAuthenticated(true)
+      setIsAdmin(true)
+      obtenerDatos()
     }
 
-    obtenerDatos()
-  }, [])
+    checkAuth()
+  }, [router])
+
+  const obtenerDatos = async () => {
+    try {
+      setCargando(true)
+      const { data: datosVentas, error: errorVentas } = await supabase
+        .from('ventas')
+        .select('*')
+        .order('id', { ascending: true })
+      if (errorVentas) throw errorVentas
+
+      const { data: datosAbonos, error: errorAbonos } = await supabase
+        .from('abono')
+        .select('*')
+        .order('fecha_abono', { ascending: true })
+      if (errorAbonos) throw errorAbonos
+
+      const { data: datosCitas, error: errorCitas } = await supabase
+        .from('citas')
+        .select('*')
+      if (errorCitas) throw errorCitas
+
+      const { data: datosTrabajadores, error: errorTrabajadores } = await supabase
+        .from('users')
+        .select('id, name')
+      if (errorTrabajadores) throw errorTrabajadores
+
+      const { data: datosServicios, error: errorServicios } = await supabase
+        .from('servicios')
+        .select('id, name_servicio')
+      if (errorServicios) throw errorServicios
+
+      setVentas(datosVentas)
+      setAbonos(datosAbonos)
+      setCitas(datosCitas)
+      setTrabajadores(datosTrabajadores)
+      setServicios(datosServicios)
+    } catch (err) {
+      setError('Error al obtener los datos. Por favor, inténtelo de nuevo más tarde.')
+      console.error(err)
+    } finally {
+      setCargando(false)
+    }
+  }
 
   const ventasFiltradas = useMemo(() => ventas.filter(venta => venta.worker_id_integer !== null), [ventas])
   const citasFiltradas = useMemo(() => citas.filter(cita => ventas.find(venta => venta.id === cita.venta_id)), [ventas, citas])
@@ -244,20 +292,75 @@ export default function InformesNegocio() {
     }
   }, [ventasYAbonosMensuales])
 
+  const serviciosMasUsados = useMemo(() => {
+    const conteoServicios: Record<string, number> = {}
+    ventas.forEach(venta => {
+      const servicio = servicios.find(s => s.id === parseInt(venta.servicio_id))
+      if (servicio) {
+        conteoServicios[servicio.name_servicio] = (conteoServicios[servicio.name_servicio] || 0) + 1
+      }
+    })
+    return Object.entries(conteoServicios)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+  }, [ventas, servicios])
+
+  const datosGraficoServiciosMasUsados = useMemo(() => ({
+    labels: serviciosMasUsados.map(([nombre]) => nombre),
+    datasets: [
+      {
+        label: 'Servicios Más Usados',
+        data: serviciosMasUsados.map(([, count]) => count),
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.6)',
+          'rgba(54, 162, 235, 0.6)',
+          'rgba(255, 206, 86, 0.6)',
+          'rgba(75, 192, 192, 0.6)',
+          'rgba(153, 102, 255, 0.6)',
+        ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(54, 162, 235, 1)',
+          'rgba(255, 206, 86, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(153, 102, 255, 1)',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  }), [serviciosMasUsados])
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'bottom' as const,
+        labels: {
+          boxWidth: 12,
+          padding: 15,
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: 'white',
+        bodyColor: 'white',
+        borderColor: 'white',
+        borderWidth: 1,
+        cornerRadius: 8,
       },
     },
     scales: {
       x: {
-        stacked: true,
+        grid: {
+          display: false,
+        },
       },
       y: {
-        stacked: true,
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)',
+        },
       },
     },
   }
@@ -265,7 +368,11 @@ export default function InformesNegocio() {
   if (cargando) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-600"></div>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full"
+        />
       </div>
     )
   }
@@ -281,9 +388,14 @@ export default function InformesNegocio() {
     )
   }
 
+  if (!isAuthenticated || !isAdmin) {
+    return null
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-100 py-8 px-4 sm:px-6 lg:px-8">
       <Header />
+      <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">Dashboard de Informes de Negocio</h1>
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <motion.div className="bg-white shadow-md rounded-lg p-4" whileHover={{ scale: 1.03 }}>
@@ -320,7 +432,6 @@ export default function InformesNegocio() {
                 <TrendingUp className="h-6 w-6 text-white" />
               </div>
               <div className="ml-3 w-0 flex-1">
-                
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Promedio Venta</dt>
                   <dd className="text-lg font-semibold text-gray-900">${valorPromedioVenta.toFixed(2)}</dd>
@@ -344,31 +455,43 @@ export default function InformesNegocio() {
           </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white shadow-md rounded-lg p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <motion.div 
+            className="bg-white shadow-md rounded-lg p-4"
+            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+          >
             <h2 className="text-lg font-semibold mb-2">Ventas y Abonos Mensuales</h2>
             <div className="h-64">
               <Bar data={datosGraficoBarras} options={chartOptions} />
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white shadow-md rounded-lg p-4">
+          <motion.div 
+            className="bg-white shadow-md rounded-lg p-4"
+            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+          >
             <h2 className="text-lg font-semibold mb-2">Abonos Diarios</h2>
             <div className="h-64">
               <Line data={datosGraficoLineas} options={chartOptions} />
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white shadow-md rounded-lg p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <motion.div 
+            className="bg-white shadow-md rounded-lg p-4"
+            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+          >
             <h2 className="text-lg font-semibold mb-2">Ventas por Trabajador</h2>
             <div className="h-64">
               <Pie data={datosGraficoCircular} options={chartOptions} />
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white shadow-md rounded-lg p-4">
+          <motion.div 
+            className="bg-white shadow-md rounded-lg p-4"
+            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+          >
             <h2 className="text-lg font-semibold mb-2">Estado de Pagos Mensuales</h2>
             <div className="h-64">
               <Bar data={datosGraficoBarrasApiladas} options={chartOptions} />
@@ -376,7 +499,19 @@ export default function InformesNegocio() {
             <div className="mt-2 text-center">
               <p className="text-lg font-semibold">{porcentajeAbonado.toFixed(2)}% del total ha sido abonado</p>
             </div>
-          </div>
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <motion.div 
+            className="bg-white shadow-md rounded-lg p-4"
+            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+          >
+            <h2 className="text-lg font-semibold mb-2">Servicios Más Usados</h2>
+            <div className="h-64">
+              <Bar data={datosGraficoServiciosMasUsados} options={chartOptions} />
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>

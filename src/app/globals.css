@@ -2,20 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
 @layer base {
+  /* Root Variables for Light and Dark Themes */
   :root {
+    /* Light Theme */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
@@ -24,67 +22,132 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* Dark Theme */
+    --dark-background: 222.2 84% 4.9%;
+    --dark-foreground: 210 40% 98%;
+    --dark-primary: 217.2 91.2% 59.8%;
+    --dark-primary-foreground: 222.2 47.4% 11.2%;
+    --dark-secondary: 217.2 32.6% 17.5%;
+    --dark-secondary-foreground: 210 40% 98%;
+    --dark-border: 217.2 32.6% 17.5%;
+    --dark-input: 217.2 32.6% 17.5%;
+    --dark-ring: 224.3 76.3% 48%;
   }
- 
+
+  /* Dark Mode Styles */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: var(--dark-background);
+    --foreground: var(--dark-foreground);
+    --primary: var(--dark-primary);
+    --primary-foreground: var(--dark-primary-foreground);
+    --secondary: var(--dark-secondary);
+    --secondary-foreground: var(--dark-secondary-foreground);
+    --border: var(--dark-border);
+    --input: var(--dark-input);
+    --ring: var(--dark-ring);
   }
 }
 
+/* General Styles */
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'Roboto', sans-serif;
+    line-height: 1.6;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* Logo with smooth transition */
+  .logo {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    filter: brightness(1.1) contrast(1.2);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .logo:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Highlighted Day Style for Calendar */
+  .highlighted-day {
+    background-color: #cfe0fc; /* Light blue */
+    color: #1d4ed8; /* Blue text */
+    border-radius: 50%; /* Circular */
+    font-weight: bold; /* Bold */
+    border: 2px solid #1d4ed8; /* Blue border */
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .highlighted-day:hover {
+    background-color: #1d4ed8; /* Darker blue on hover */
+    color: #fff; /* White text */
+  }
+
+  /* Accessibility Improvement */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    overflow: hidden;
   }
 }
-/* styles/globals.css */
 
-.logo {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  filter: brightness(1.1) contrast(1.2);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-.logo:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
-}
-/* Estilos para resaltar los días con citas */
-.highlighted-day {
-  background-color: #cfe0fc; /* Fondo azul claro */
-  color: #1d4ed8; /* Texto azul */
-  border-radius: 50%; /* Hacerlo circular */
-  font-weight: bold; /* Texto en negrita */
-  border: 2px solid #1d4ed8; /* Borde azul */
-}
+/* Responsive Design */
 @media (min-width: 768px) {
   .md\:flex {
     display: flex !important;
   }
+
   .md\:hidden {
     display: none !important;
   }
+
   .md\:block {
     display: block !important;
   }
+
+  /* Improve card layout */
+  .card {
+    border-radius: var(--radius);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+
+  .card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Cards with better borders and shadows */
+  .card-content {
+    background-color: var(--card);
+    padding: 1rem;
+    border-radius: var(--radius);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .card-content:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
 }
+

@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react"
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from "framer-motion"
-import { Edit2, Trash2, X, Check, Search, Filter, Bell, Menu, LogOut } from 'lucide-react'
+import { Edit2, Trash2, X, Check, Search, Filter, Home } from 'lucide-react'
 import Image from 'next/image'
-
+import Link from "next/link"
 interface Trabajador {
   id: number
   name: string | null
@@ -39,15 +39,10 @@ function Header() {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Bell size={24} />
-        </button>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <Menu size={24} />
-        </button>
-        <button className="text-white hover:text-gray-200 transition-colors">
-          <LogOut size={24} />
-        </button>
+      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
       </div>
     </motion.header>
   )
