@@ -123,24 +123,37 @@ export default function AssignAppointments() {
   }, [searchTerm, currentPage])
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-      } else {
-        setIsAuthenticated(true)
-        const { data: userData } = await supabase
+    const checkUserRole = async () => {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user) {
+          router.push('/login')
+          return
+        }
+
+        const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role')
-          .eq('id', session.user.id)
+          .eq('email', user.email)
           .single()
-        if (userData) {
-          setUserRole(userData.role)
+
+        if (userError || !userData) {
+          console.error('Error fetching user role:', userError)
+          setError('Error al obtener el rol del usuario')
+          return
         }
+
+        setUserRole(userData.role)
+        setIsAuthenticated(true)
         fetchSales()
+      } catch (error) {
+        console.error('Error checking user role:', error)
+        setError('Error al verificar el rol del usuario')
       }
     }
-    checkAuth()
+
+    checkUserRole()
   }, [router, fetchSales])
 
   useEffect(() => {

@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home, Search, Edit, Trash2, Eye, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react'
@@ -43,68 +43,10 @@ type Cita = {
   start_time: string
 }
 
-type User = {
-  id: number
-  name: string
-}
-
-function Header() {
-  const [userRole, setUserRole] = useState('')
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-        if (userData) {
-          setUserRole(userData.role)
-        }
-      }
-    }
-    fetchUserRole()
-  }, [])
-
-  return (
-    <motion.header 
-      initial={{ opacity: 0, y: -50 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
-    >
-      <div className="flex items-center space-x-2 sm:space-x-4">
-        <Image
-          src="/Imagen1.png" 
-          alt="Logo de Angeles"
-          width={40}
-          height={40}
-          className="rounded-full border-2 border-white shadow-md"
-        />
-        <motion.span 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-lg sm:text-2xl font-bold tracking-wide"
-        >
-          Angeles
-        </motion.span>
-      </div>
-      <div className="flex items-center space-x-4">
-        <Link href={userRole === 'admin' ? "/jefe" : "/trabajador"} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
-          <Home size={24} />
-          <span className="hidden sm:inline">Volver al Menú</span>
-        </Link>
-      </div>
-    </motion.header>
-  )
-}
-
 export default function VentasActivas() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
@@ -115,33 +57,49 @@ export default function VentasActivas() {
     ventas_id_venta: 0,
     amount: 0
   })
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [users, setUsers] = useState<User[]>([])
-  const [selectedUser, setSelectedUser] = useState<number | ''>('')
-  const [selectedMonth, setSelectedMonth] = useState<string>('')
-
-  const ventasPorPagina = 10
+  const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
-
-  const checkAuth = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      router.push('/login')
-      return
-    }
-    setIsAuthenticated(true)
-    fetchVentas()
-    fetchUsers()
-  }, [router])
+  
+  const ventasPorPagina = 10
 
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    checkUserRole()
+  }, [])
+
+  const checkUserRole = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        router.push('/login')
+        return
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('email', user.email)
+        .single()
+
+      if (userError || !userData) {
+        console.error('Error fetching user role:', userError)
+        setError('Error al obtener el rol del usuario')
+        return
+      }
+
+      setUserRole(userData.role)
+      fetchVentas()
+    } catch (error) {
+      console.error('Error checking user role:', error)
+      setError('Error al verificar el rol del usuario')
+    }
+  }
 
   const fetchVentas = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('ventas')
         .select(`
           *,
@@ -153,9 +111,13 @@ export default function VentasActivas() {
           tipo_pago (id_tipo_pago, name_comision, porcentaje)
         `)
 
+      if (error) {
+        console.error('Supabase error:', error)
+        throw new Error(`Error fetching ventas: ${error.message}`)
+      }
+
       if (!data) {
-        console.error('Error fetching ventas: No data returned from Supabase')
-        throw new Error('Error fetching ventas: No data returned from Supabase')
+        throw new Error('No data returned from Supabase')
       }
 
       const ventasFormateadas = data
@@ -180,27 +142,11 @@ export default function VentasActivas() {
           }
         })
       setVentas(ventasFormateadas)
-    } catch (err) {
-      console.error('Error in fetchVentas:', err)
+    } catch (error) {
+      console.error('Error in fetchVentas:', error)
+      setError(error instanceof Error ? error.message : 'An unknown error occurred')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name')
-        .order('name', { ascending: true })
-
-      if (error) throw error
-
-      if (data) {
-        setUsers(data)
-      }
-    } catch (error) {
-      console.error('Error al obtener los usuarios:', error)
     }
   }
 
@@ -341,24 +287,7 @@ export default function VentasActivas() {
     }
   }
 
-  const filterComisiones = useCallback(() => {
-    let filtered = [...ventas]
-
-    if (selectedUser) {
-      filtered = filtered.filter(venta => venta.worker_id_integer === selectedUser)
-    }
-
-    if (selectedMonth) {
-      filtered = filtered.filter(venta => {
-        const ventaDate = new Date(venta.next_appointment || '')
-        return ventaDate.getMonth() === parseInt(selectedMonth) - 1 // Months are 0-indexed
-      })
-    }
-
-    return filtered
-  }, [ventas, selectedUser, selectedMonth])
-
-  const ventasFiltradas = filterComisiones().filter(venta =>
+  const ventasFiltradas = ventas.filter(venta =>
     venta.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     venta.worker_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     venta.service_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -387,7 +316,8 @@ export default function VentasActivas() {
     })
   }
 
-  const renderVentasTable = (ventas: Venta[]) => <div className="overflow-x-auto">
+  const renderVentasTable = (ventas: Venta[]) => (
+    <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -438,10 +368,7 @@ export default function VentasActivas() {
         </tbody>
       </table>
     </div>
-
-  if (!isAuthenticated) {
-    return null
-  }
+  )
 
   if (loading) {
     return (
@@ -455,10 +382,57 @@ export default function VentasActivas() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700">{error}</p>
+          <button 
+            onClick={fetchVentas} 
+            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <Header />
+        <motion.header 
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
+        >
+          <div className="flex items-center space-x-4">
+            <Image
+              src="/Imagen1.png" 
+              alt="Logo de Angeles"
+              width={50}
+              height={50}
+              className="rounded-full border-2 border-white shadow-md"
+            />
+            <motion.span 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-2xl font-bold tracking-wide"
+            >
+              Angeles - Ventas
+            </motion.span>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Link href={userRole === 'admin' ? '/jefe' : '/trabajador'} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+              <Home size={24} />
+              <span className="hidden sm:inline">Volver al Menú</span>
+            </Link>
+          </div>
+        </motion.header>
+
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -477,45 +451,6 @@ export default function VentasActivas() {
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
                 />
                 <Search className="absolute left-3 top-2.5 text-gray-400" size={20} />
-              </div>
-            </div>
-
-            <div className="mb-6 flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="user" className="block text-sm font-medium text-gray-700 mb-1">
-                  Filtrar por Usuario
-                </label>
-                <select
-                  id="user"
-                  value={selectedUser}
-                  onChange={(e) => setSelectedUser(e.target.value ? parseInt(e.target.value) : '')}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
-                >
-                  <option value="">Todos los usuarios</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="month" className="block text-sm font-medium text-gray-700 mb-1">
-                  Filtrar por Mes
-                </label>
-                <select
-                  id="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
-                >
-                  <option value="">Todos los meses</option>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                    <option key={month} value={month}>
-                      {new Date(0, month - 1).toLocaleString('default', { month: 'long' })}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -638,7 +573,7 @@ export default function VentasActivas() {
                     id="price"
                     value={selectedVenta.price}
                     onChange={(e) => setSelectedVenta({...selectedVenta, price: parseFloat(e.target.value)})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm: text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
                 <div>
@@ -647,23 +582,11 @@ export default function VentasActivas() {
                     id="description"
                     value={selectedVenta.description}
                     onChange={(e) => setSelectedVenta({...selectedVenta, description: e.target.value})}
+                    rows={3}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
+                  ></textarea>
                 </div>
-                <div>
-                  <label htmlFor="tipoPago" className="block text-sm font-medium text-gray-700">Tipo de Pago</label>
-                  <select
-                    id="tipoPago"
-                    value={selectedVenta.id_tipo_pago}
-                    onChange={(e) => setSelectedVenta({...selectedVenta, id_tipo_pago: parseInt(e.target.value)})}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                  >
-                    <option value={1}>Efectivo</option>
-                    <option value={2}>Transferencia</option>
-                    <option value={3}>Tarjeta de Crédito</option>
-                  </select>
-                </div>
-                <div className="flex justify-end space-x-3">
+                <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
@@ -701,35 +624,37 @@ export default function VentasActivas() {
               <h3 className="text-lg font-medium mb-4">Agregar Pago</h3>
               <form onSubmit={handleNewPaymentSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Monto</label>
+                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Monto del Pago</label>
                   <input
                     type="number"
                     id="amount"
                     name="amount"
-                    value={newPayment.amount}
+                    value={newPayment.amount.toString()}
                     onChange={handleNewPaymentChange}
+                    min="0"
+                    step="1"
+                    max={selectedVenta.price - selectedVenta.total_paid}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    required
                   />
                 </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-gray-500">
-                    Monto restante: {formatCurrency(selectedVenta.price - selectedVenta.total_paid)}
-                  </p>
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentModal(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Agregar Pago
-                    </button>
-                  </div>
+                <p className="text-sm text-gray-500">
+                  Monto restante: {formatCurrency(selectedVenta.price - selectedVenta.total_paid)}
+                </p>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Agregar Pago
+                  </button>
                 </div>
               </form>
             </motion.div>
