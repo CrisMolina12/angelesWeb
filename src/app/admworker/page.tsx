@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react"
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from "framer-motion"
-import { Edit2, Trash2, X, Check, Search, Filter, Home } from 'lucide-react'
+import { Edit2, X, Check, Search, Filter, Home } from 'lucide-react'
 import Image from 'next/image'
 import Link from "next/link"
 interface Trabajador {
@@ -121,23 +121,6 @@ export default function AdminTrabajadores() {
     setEditableTrabajador(trabajador)
   }
 
-  const handleDelete = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from("users")
-        .delete()
-        .eq("id", id)
-
-      if (error) {
-        throw error
-      }
-
-      await fetchTrabajadores()
-    } catch (error) {
-      console.error("Error al eliminar el trabajador:", error)
-      setError("Error al eliminar el trabajador. Por favor, intente de nuevo.")
-    }
-  }
 
   const handleUpdate = async (updatedTrabajador: Trabajador) => {
     try {
@@ -249,14 +232,6 @@ export default function AdminTrabajadores() {
                         className="text-blue-500 hover:text-blue-600 transition duration-300"
                       >
                         <Edit2 size={20} />
-                      </motion.button>
-                      <motion.button 
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleDelete(trabajador.id)}
-                        className="text-red-500 hover:text-red-600 transition duration-300"
-                      >
-                        <Trash2 size={20} />
                       </motion.button>
                     </div>
                   </li>

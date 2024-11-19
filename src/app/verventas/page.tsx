@@ -29,6 +29,7 @@ type Venta = {
 type NewPayment = {
   ventas_id_venta: number
   amount: number
+  id_tipo_pago: number
 }
 
 type TipoPago = {
@@ -55,15 +56,18 @@ export default function VentasActivas() {
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null)
   const [newPayment, setNewPayment] = useState<NewPayment>({
     ventas_id_venta: 0,
-    amount: 0
+    amount: 0,
+    id_tipo_pago: 0
   })
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [tiposPago, setTiposPago] = useState<TipoPago[]>([])
   const router = useRouter()
   
   const ventasPorPagina = 10
 
   useEffect(() => {
     checkUserRole()
+    fetchTiposPago()
   }, [])
 
   const checkUserRole = async () => {
@@ -82,7 +86,7 @@ export default function VentasActivas() {
         .single()
 
       if (userError || !userData) {
-        console.error('Error fetching user role:', userError)
+        console.error('Error al obtener el rol del usuario:', userError)
         setError('Error al obtener el rol del usuario')
         return
       }
@@ -90,8 +94,23 @@ export default function VentasActivas() {
       setUserRole(userData.role)
       fetchVentas()
     } catch (error) {
-      console.error('Error checking user role:', error)
+      console.error('Error al verificar el rol del usuario:', error)
       setError('Error al verificar el rol del usuario')
+    }
+  }
+
+  const fetchTiposPago = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tipo_pago')
+        .select('*')
+
+      if (error) throw error
+
+      setTiposPago(data)
+    } catch (error) {
+      console.error('Error al obtener los tipos de pago:', error)
+      setError('Error al obtener los tipos de pago')
     }
   }
 
@@ -112,12 +131,12 @@ export default function VentasActivas() {
         `)
 
       if (error) {
-        console.error('Supabase error:', error)
-        throw new Error(`Error fetching ventas: ${error.message}`)
+        console.error('Error de Supabase:', error)
+        throw new Error(`Error al obtener las ventas: ${error.message}`)
       }
 
       if (!data) {
-        throw new Error('No data returned from Supabase')
+        throw new Error('No se recibieron datos de Supabase')
       }
 
       const ventasFormateadas = data
@@ -143,8 +162,8 @@ export default function VentasActivas() {
         })
       setVentas(ventasFormateadas)
     } catch (error) {
-      console.error('Error in fetchVentas:', error)
-      setError(error instanceof Error ? error.message : 'An unknown error occurred')
+      console.error('Error en fetchVentas:', error)
+      setError(error instanceof Error ? error.message : 'Ocurrió un error desconocido')
     } finally {
       setLoading(false)
     }
@@ -175,7 +194,7 @@ export default function VentasActivas() {
       fetchVentas()
       alert('Venta actualizada con éxito.')
     } catch (error) {
-      console.error('Error updating venta:', error)
+      console.error('Error al actualizar la venta:', error)
       alert('Hubo un error al actualizar la venta. Por favor, inténtalo de nuevo.')
     }
   }
@@ -195,7 +214,7 @@ export default function VentasActivas() {
         fetchVentas()
         alert('Venta eliminada con éxito.')
       } catch (error) {
-        console.error('Error deleting venta:', error)
+        console.error('Error al eliminar la venta:', error)
         alert('Hubo un error al eliminar la venta. Por favor, inténtalo de nuevo.')
       }
     }
@@ -208,13 +227,13 @@ export default function VentasActivas() {
 
   const handleAddPayment = (venta: Venta) => {
     setSelectedVenta(venta)
-    setNewPayment({ ventas_id_venta: venta.id, amount: 0 })
+    setNewPayment({ ventas_id_venta: venta.id, amount: 0, id_tipo_pago: venta.id_tipo_pago })
     setShowPaymentModal(true)
   }
 
-  const handleNewPaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewPaymentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    const numericValue = parseFloat(value)
+    const numericValue = name === 'amount' ? parseFloat(value) : parseInt(value, 10)
     setNewPayment(prev => ({
       ...prev,
       [name]: isNaN(numericValue) ? 0 : numericValue
@@ -238,28 +257,28 @@ export default function VentasActivas() {
           ventas_id_venta: newPayment.ventas_id_venta,
           cantidad_abonada: newPayment.amount,
           fecha_abono: new Date().toISOString(),
-          id_tipo_pago: selectedVenta.tipo_pago?.id_tipo_pago
+          id_tipo_pago: newPayment.id_tipo_pago
         })
         .select()
 
       if (abonoError) {
-        console.error('Error inserting abono:', abonoError)
+        console.error('Error al insertar abono:', abonoError)
         throw abonoError
       }
 
-      console.log('Abono inserted successfully:', abonoData)
+      console.log('Abono insertado con éxito:', abonoData)
 
-      if (!selectedVenta.tipo_pago) {
-        console.error('Tipo de pago not found for venta:', selectedVenta)
-        alert('Error: Tipo de pago no encontrado para esta venta. Por favor, actualice la venta con un tipo de pago válido.')
+      const tipoPago = tiposPago.find(tp => tp.id_tipo_pago === newPayment.id_tipo_pago)
+      if (!tipoPago) {
+        console.error('Tipo de pago no encontrado:', newPayment.id_tipo_pago)
+        alert('Error: Tipo de pago no encontrado. Por favor, seleccione un tipo de pago válido.')
         return
       }
 
-      const tipoPago = selectedVenta.tipo_pago
       const montoConPorcentajeTipoPago = newPayment.amount * (1 - tipoPago.porcentaje / 100)
       const comision = Math.round(montoConPorcentajeTipoPago * 0.1)
 
-      console.log('Calculated commission:', comision)
+      console.log('Comisión calculada:', comision)
 
       const { data: comisionData, error: comisionError } = await supabase
         .from('comision')
@@ -272,17 +291,17 @@ export default function VentasActivas() {
         .select()
 
       if (comisionError) {
-        console.error('Error inserting comision:', comisionError)
+        console.error('Error al insertar comisión:', comisionError)
         throw comisionError
       }
 
-      console.log('Comision inserted successfully:', comisionData)
+      console.log('Comisión insertada con éxito:', comisionData)
 
       setShowPaymentModal(false)
       fetchVentas()
       alert('Pago y comisión agregados con éxito.')
     } catch (error) {
-      console.error('Error adding new payment and commission:', error)
+      console.error('Error al agregar nuevo pago y comisión:', error)
       alert('Hubo un error al agregar el pago y la comisión. Por favor, inténtalo de nuevo.')
     }
   }
@@ -483,7 +502,7 @@ export default function VentasActivas() {
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
-                  <span className="sr-only">Previous</span>
+                  <span className="sr-only">Anterior</span>
                   <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                 </button>
                 {pageNumbers.map(number => (
@@ -501,7 +520,7 @@ export default function VentasActivas() {
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageNumbers.length))}
                   className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
-                  <span className="sr-only">Next</span>
+                  <span className="sr-only">Siguiente</span>
                   <ChevronRight className="h-5 w-5" aria-hidden="true" />
                 </button>
               </nav>
@@ -586,6 +605,21 @@ export default function VentasActivas() {
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   ></textarea>
                 </div>
+                <div>
+                  <label htmlFor="id_tipo_pago" className="block text-sm font-medium text-gray-700">Tipo de Pago</label>
+                  <select
+                    id="id_tipo_pago"
+                    value={selectedVenta.id_tipo_pago}
+                    onChange={(e) => setSelectedVenta({...selectedVenta, id_tipo_pago: parseInt(e.target.value, 10)})}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    {tiposPago.map((tipo) => (
+                      <option key={tipo.id_tipo_pago} value={tipo.id_tipo_pago}>
+                        {tipo.name_comision}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
@@ -637,6 +671,24 @@ export default function VentasActivas() {
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     required
                   />
+                </div>
+                <div>
+                  <label htmlFor="id_tipo_pago" className="block text-sm font-medium text-gray-700">Tipo de Pago</label>
+                  <select
+                    id="id_tipo_pago"
+                    name="id_tipo_pago"
+                    value={newPayment.id_tipo_pago}
+                    onChange={handleNewPaymentChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    required
+                  >
+                    <option value="">Seleccione un tipo de pago</option>
+                    {tiposPago.map((tipo) => (
+                      <option key={tipo.id_tipo_pago} value={tipo.id_tipo_pago}>
+                        {tipo.name_comision}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <p className="text-sm text-gray-500">
                   Monto restante: {formatCurrency(selectedVenta.price - selectedVenta.total_paid)}

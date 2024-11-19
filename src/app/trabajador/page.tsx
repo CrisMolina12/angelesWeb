@@ -16,8 +16,8 @@ function Header() {
       className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
     >
       <div className="flex items-center space-x-4">
-        <Image
-          src="/imagen1.png" 
+      <Image
+          src="/Imagen1.png"
           alt="Logo de Angeles"
           width={50}
           height={50}
