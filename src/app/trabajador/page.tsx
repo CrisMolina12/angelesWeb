@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Calendar, DollarSign, UserPlus, Clipboard, LogOut, Bell, Menu, Clock } from 'lucide-react'
+import { Calendar, DollarSign, UserPlus, Clipboard, LogOut, Bell, Menu, Clock, Eye } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -182,6 +182,12 @@ export default function TrabajadorDashboard() {
                 description="Programar nuevas citas para los clientes."
                 icon={<Clock className="h-8 w-8 text-white" />}
                 link="/citas"
+              />
+              <ActionCard 
+                title="Ver Ventas" 
+                description="Visualizar y gestionar las ventas realizadas."
+                icon={<Eye className="h-8 w-8 text-white" />}
+                link="/verventas"
               />
             </div>
           </div>

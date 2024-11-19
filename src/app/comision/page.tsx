@@ -6,13 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import supabase from "../../../lib/supabaseClient"
 import { motion } from 'framer-motion'
-import { Edit, Trash2, ChevronDown, ChevronUp, Home } from 'lucide-react'
-
-type Abono = {
-  id: number
-  cantidad_abonada: number
-  fecha_abono: string
-}
+import { Home } from 'lucide-react'
 
 type Comision = {
   id_comision: number
@@ -21,19 +15,7 @@ type Comision = {
   monto_comision: number
   fecha_comision: string
   empleado_name?: string
-  venta_total?: number
-  tipo_pago?: string
-  porcentaje_comision?: number
-}
-
-type VentaAgrupada = {
-  ventas_id_venta: number
-  venta_total: number
-  tipo_pago: string
-  porcentaje_comision: number
-  empleado_name: string
-  comisiones: Comision[]
-  abonos: Abono[]
+  porcentaje_tipo_pago?: number
 }
 
 type User = {
@@ -49,7 +31,7 @@ function Header() {
       transition={{ duration: 0.5 }}
       className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
     >
-         <div className="flex items-center space-x-2 sm:space-x-4">
+      <div className="flex items-center space-x-2 sm:space-x-4">
         <Image
           src="/Imagen1.png" 
           alt="Logo de Angeles"
@@ -77,10 +59,9 @@ function Header() {
 }
 
 export default function ComisionesTable() {
-  const [ventasAgrupadas, setVentasAgrupadas] = useState<VentaAgrupada[]>([])
-  const [filteredVentas, setFilteredVentas] = useState<VentaAgrupada[]>([])
+  const [comisiones, setComisiones] = useState<Comision[]>([])
+  const [filteredComisiones, setFilteredComisiones] = useState<Comision[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedRows, setExpandedRows] = useState<number[]>([])
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [users, setUsers] = useState<User[]>([])
@@ -119,50 +100,20 @@ export default function ComisionesTable() {
         .select(`
           *,
           empleado:empleado_id_empleado(name),
-          venta:ventas_id_venta(
-            id,
-            price,
-            tipo_pago(name_comision, porcentaje),
-            abono(id, cantidad_abonada, fecha_abono)
-          )
+          venta:ventas_id_venta(tipo_pago(porcentaje))
         `)
         .order('fecha_comision', { ascending: false })
 
       if (error) throw error
 
       if (data) {
-        const ventasMap = new Map<number, VentaAgrupada>()
-
-        data.forEach((comision) => {
-          const ventaId = comision.ventas_id_venta
-          if (!ventasMap.has(ventaId)) {
-            ventasMap.set(ventaId, {
-              ventas_id_venta: ventaId,
-              venta_total: comision.venta?.price || 0,
-              tipo_pago: comision.venta?.tipo_pago?.name_comision || '',
-              porcentaje_comision: comision.venta?.tipo_pago?.porcentaje || 0,
-              empleado_name: comision.empleado?.name || '',
-              comisiones: [],
-              abonos: comision.venta?.abono || []
-            })
-          }
-
-          ventasMap.get(ventaId)!.comisiones.push({
-            id_comision: comision.id_comision,
-            ventas_id_venta: comision.ventas_id_venta,
-            empleado_id_empleado: comision.empleado_id_empleado,
-            monto_comision: comision.monto_comision,
-            fecha_comision: comision.fecha_comision,
-            empleado_name: comision.empleado?.name,
-            venta_total: comision.venta?.price,
-            tipo_pago: comision.venta?.tipo_pago?.name_comision,
-            porcentaje_comision: comision.venta?.tipo_pago?.porcentaje,
-          })
-        })
-
-        const ventasAgrupadas = Array.from(ventasMap.values())
-        setVentasAgrupadas(ventasAgrupadas)
-        setFilteredVentas(ventasAgrupadas)
+        const comisionesData = data.map(comision => ({
+          ...comision,
+          empleado_name: comision.empleado?.name,
+          porcentaje_tipo_pago: comision.venta?.tipo_pago?.porcentaje
+        }))
+        setComisiones(comisionesData)
+        setFilteredComisiones(comisionesData)
       }
     } catch (error) {
       console.error('Error al obtener las comisiones:', error)
@@ -188,74 +139,30 @@ export default function ComisionesTable() {
     }
   }
 
-  const filterVentas = useCallback(() => {
-    let filtered = [...ventasAgrupadas]
+  const filterComisiones = useCallback(() => {
+    let filtered = [...comisiones]
 
     if (selectedUser) {
-      filtered = filtered.filter(venta => venta.comisiones.some(comision => comision.empleado_id_empleado === selectedUser))
+      filtered = filtered.filter(comision => comision.empleado_id_empleado === selectedUser)
     }
 
     if (selectedMonth) {
-      filtered = filtered.filter(venta => {
-        const ventaDate = new Date(venta.comisiones[0].fecha_comision)
-        return ventaDate.getMonth() === parseInt(selectedMonth) - 1 // Months are 0-indexed
+      filtered = filtered.filter(comision => {
+        const comisionDate = new Date(comision.fecha_comision)
+        return comisionDate.getMonth() === parseInt(selectedMonth) - 1 // Months are 0-indexed
       })
     }
 
-    setFilteredVentas(filtered)
-  }, [ventasAgrupadas, selectedUser, selectedMonth])
+    setFilteredComisiones(filtered)
+  }, [comisiones, selectedUser, selectedMonth])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
   useEffect(() => {
-    filterVentas()
-  }, [filterVentas])
-
-  const handleEdit = (id: number) => {
-    // Implementar lógica para editar comisión
-    console.log('Editar comisión:', id)
-  }
-
-  const handleDelete = async (id: number) => {
-    if (window.confirm('¿Está seguro de que desea eliminar esta comisión?')) {
-      try {
-        const { error } = await supabase
-          .from('comision')
-          .delete()
-          .eq('id_comision', id)
-
-        if (error) throw error
-
-        // Actualizar el estado después de eliminar
-        setVentasAgrupadas(prevVentas => 
-          prevVentas.map(venta => ({
-            ...venta,
-            comisiones: venta.comisiones.filter(comision => comision.id_comision !== id)
-          })).filter(venta => venta.comisiones.length > 0)
-        )
-      } catch (error) {
-        console.error('Error al eliminar la comisión:', error)
-      }
-    }
-  }
-
-  const toggleRowExpansion = (id: number) => {
-    setExpandedRows(prev =>
-      prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
-    )
-  }
-
-  const calcularComision = (abono: number) => {
-    return (abono * 0.92) * 0.1
-  }
-
-  const calcularTotalComisiones = (venta: VentaAgrupada) => {
-    return venta.abonos.reduce((total, abono) => 
-      total + calcularComision(abono.cantidad_abonada), 0
-    )
-  }
+    filterComisiones()
+  }, [filterComisiones])
 
   if (!isAuthenticated || !isAdmin) {
     return null
@@ -322,76 +229,24 @@ export default function ComisionesTable() {
               <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
                 <thead className="bg-purple-600 text-white">
                   <tr>
-                    <th className="py-3 px-4 text-left"></th>
+                    <th className="py-3 px-4 text-left">ID Comisión</th>
                     <th className="py-3 px-4 text-left">ID Venta</th>
                     <th className="py-3 px-4 text-left">Usuario</th>
-                    <th className="py-3 px-4 text-left">Venta Total</th>
-                    <th className="py-3 px-4 text-left">Tipo de Pago</th>
-                    <th className="py-3 px-4 text-left">Comisión Total</th>
-                    <th className="py-3 px-4 text-left">Acciones</th>
+                    <th className="py-3 px-4 text-left">Monto Comisión</th>
+                    <th className="py-3 px-4 text-left">Fecha Comisión</th>
+                    <th className="py-3 px-4 text-left">% Tipo de Pago</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredVentas.map((venta) => (
-                    <React.Fragment key={venta.ventas_id_venta}>
-                      <tr className="border-b hover:bg-gray-100">
-                        <td className="py-3 px-4">
-                          <button onClick={() => toggleRowExpansion(venta.ventas_id_venta)}>
-                            {expandedRows.includes(venta.ventas_id_venta) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                          </button>
-                        </td>
-                        <td className="py-3 px-4">{venta.ventas_id_venta}</td>
-                        <td className="py-3 px-4">{venta.empleado_name}</td>
-                        <td className="py-3 px-4">${venta.venta_total.toLocaleString('es-CL')}</td>
-                        <td className="py-3 px-4">{venta.tipo_pago}</td>
-                        <td className="py-3 px-4">${calcularTotalComisiones(venta).toLocaleString('es-CL')}</td>
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={() => handleEdit(venta.ventas_id_venta)}
-                            className="text-blue-600 hover:text-blue-800 mr-2"
-                          >
-                            <Edit size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(venta.ventas_id_venta)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedRows.includes(venta.ventas_id_venta) && (
-                        <tr>
-                          <td colSpan={7}>
-                            <div className="p-4 bg-gray-50">
-                              <h4 className="font-semibold mb-2">Abonos:</h4>
-                              <table className="w-full">
-                                <thead>
-                                  <tr>
-                                    <th className="py-2 px-4 text-left">ID Abono</th>
-                                    <th className="py-2 px-4 text-left">Cantidad Abonada</th>
-                                    <th className="py-2 px-4 text-left">Fecha Abono</th>
-                                    <th className="py-2 px-4 text-left">Comisión</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {venta.abonos.map((abono) => (
-                                    <tr key={abono.id}>
-                                      <td className="py-2 px-4">{abono.id}</td>
-                                      <td className="py-2 px-4">${abono.cantidad_abonada.toLocaleString('es-CL')}</td>
-                                      <td className="py-2 px-4">{new Date(abono.fecha_abono).toLocaleDateString()}</td>
-                                      <td className="py-2 px-4">
-                                        ${calcularComision(abono.cantidad_abonada).toLocaleString('es-CL')}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
+                  {filteredComisiones.map((comision) => (
+                    <tr key={comision.id_comision} className="border-b hover:bg-gray-100">
+                      <td className="py-3 px-4">{comision.id_comision}</td>
+                      <td className="py-3 px-4">{comision.ventas_id_venta}</td>
+                      <td className="py-3 px-4">{comision.empleado_name}</td>
+                      <td className="py-3 px-4">${comision.monto_comision.toLocaleString('es-CL')}</td>
+                      <td className="py-3 px-4">{new Date(comision.fecha_comision).toLocaleDateString()}</td>
+                      <td className="py-3 px-4">{comision.porcentaje_tipo_pago}%</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>

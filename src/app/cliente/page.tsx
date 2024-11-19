@@ -8,7 +8,9 @@ import { UserPlus, Phone, CreditCard, Check, X, Home } from 'lucide-react'
 import supabase from '../../../lib/supabaseClient'
 import Link from 'next/link'
 
-function Header() {
+function Header({ userRole }: { userRole: string | null }) {
+  const homeLink = userRole === 'admin' ? '/jefe' : '/trabajador'
+
   return (
     <motion.header 
       initial={{ opacity: 0, y: -50 }}
@@ -34,7 +36,7 @@ function Header() {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+        <Link href={homeLink} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
           <Home size={24} />
           <span className="hidden sm:inline">Volver al Menú</span>
         </Link>
@@ -160,7 +162,7 @@ export default function RegisterClient() {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Header />
+        <Header userRole={role} />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

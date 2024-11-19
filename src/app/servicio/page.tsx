@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, } from 'framer-motion'
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import Image from 'next/image'
 import supabase from '../../../lib/supabaseClient'
-import { Plus,  Edit, X, Check, ToggleLeft, ToggleRight, Home } from 'lucide-react'
+import { Plus, Edit, X, Check, ToggleLeft, ToggleRight, Home } from 'lucide-react'
 import Link from 'next/link'
+
 interface Servicio {
   id: number
   name_servicio: string
@@ -43,7 +45,7 @@ function Header() {
       </div>
       
       <div className="flex items-center space-x-4">
-      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
           <Home size={24} />
           <span className="hidden sm:inline">Volver al Menú</span>
         </Link>
@@ -64,10 +66,37 @@ export default function ServicioManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
-    fetchServicios()
+    checkAuth()
   }, [])
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return
+    }
+
+    setIsAuthenticated(true)
+
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('email', session.user.email)
+      .single()
+
+    if (error || !userData || userData.role !== 'admin') {
+      router.push('/autorizacion')
+      return
+    }
+
+    setIsAdmin(true)
+    fetchServicios()
+  }
 
   const fetchServicios = async () => {
     setIsLoading(true)
@@ -151,6 +180,10 @@ export default function ServicioManagement() {
   const filteredServicios = servicios.filter((servicio) =>
     servicio.name_servicio.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  if (!isAuthenticated || !isAdmin) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">

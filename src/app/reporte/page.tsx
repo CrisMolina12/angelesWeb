@@ -45,6 +45,7 @@ type Venta = {
   worker_id: string | null
   worker_id_integer: number | null
   servicio_id: string
+  fecha_transaccion: string
 }
 
 type Abono = {
@@ -70,6 +71,8 @@ type Servicio = {
   name_servicio: string
 }
 
+type FiltroTiempo = '24h' | 'semana' | 'mes' | 'todo'
+
 export default function InformesNegocio() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [abonos, setAbonos] = useState<Abono[]>([])
@@ -80,6 +83,7 @@ export default function InformesNegocio() {
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [filtroTiempo, setFiltroTiempo] = useState<FiltroTiempo>('todo')
   const router = useRouter()
 
   useEffect(() => {
@@ -114,13 +118,19 @@ export default function InformesNegocio() {
     checkAuth()
   }, [router])
 
+  useEffect(() => {
+    const ahora = new Date()
+    const hace24Horas = new Date(ahora.getTime() - 24 * 60 * 60 * 1000)
+    console.log(`Filtrando datos desde ${hace24Horas.toISOString()} hasta ${ahora.toISOString()}`)
+  }, [filtroTiempo])
+
   const obtenerDatos = async () => {
     try {
       setCargando(true)
       const { data: datosVentas, error: errorVentas } = await supabase
         .from('ventas')
         .select('*')
-        .order('id', { ascending: true })
+        .order('fecha_transaccion', { ascending: false })
       if (errorVentas) throw errorVentas
 
       const { data: datosAbonos, error: errorAbonos } = await supabase
@@ -157,11 +167,55 @@ export default function InformesNegocio() {
     }
   }
 
-  const ventasFiltradas = useMemo(() => ventas.filter(venta => venta.worker_id_integer !== null), [ventas])
-  const citasFiltradas = useMemo(() => citas.filter(cita => ventas.find(venta => venta.id === cita.venta_id)), [ventas, citas])
-  
+  const filtrarPorTiempo = (fecha: string) => {
+    const ahora = new Date()
+    const fechaComparar = new Date(fecha)
+    const diferenciaTiempo = ahora.getTime() - fechaComparar.getTime()
+    const diferenciaHoras = diferenciaTiempo / (1000 * 3600)
+
+    switch (filtroTiempo) {
+      case '24h':
+        return diferenciaHoras <= 24
+      case 'semana':
+        return diferenciaTiempo <= 7 * 24 * 60 * 60 * 1000
+      case 'mes':
+        return diferenciaTiempo <= 30 * 24 * 60 * 60 * 1000
+      default:
+        return true
+    }
+  }
+
+  const ventasFiltradas = useMemo(() => {
+    const filtradas = ventas.filter(venta => {
+      const cumpleFiltro = venta.worker_id_integer !== null && filtrarPorTiempo(venta.fecha_transaccion)
+      if (filtroTiempo === '24h') {
+        console.log(`Venta: ${venta.id}, Fecha: ${venta.fecha_transaccion}, Incluida: ${cumpleFiltro}`)
+      }
+      return cumpleFiltro
+    })
+    console.log(`Total ventas filtradas: ${filtradas.length}`)
+    return filtradas
+  }, [ventas, filtroTiempo])
+
+  const abonosFiltrados = useMemo(() => {
+    const filtrados = abonos.filter(abono => {
+      const cumpleFiltro = filtrarPorTiempo(abono.fecha_abono)
+      if (filtroTiempo === '24h') {
+        console.log(`Abono: ${abono.id}, Fecha: ${abono.fecha_abono}, Incluido: ${cumpleFiltro}`)
+      }
+      return cumpleFiltro
+    })
+    console.log(`Total abonos filtrados: ${filtrados.length}`)
+    return filtrados
+  }, [abonos, filtroTiempo])
+
+  const citasFiltradas = useMemo(() => 
+    citas.filter(cita => filtrarPorTiempo(cita.service_date) && ventas.find(venta => venta.id === cita.venta_id)),
+    [citas, ventas, filtroTiempo]
+  )
+
   const ventasTotales = useMemo(() => ventasFiltradas.reduce((sum, venta) => sum + venta.price, 0), [ventasFiltradas])
-  const abonosTotales = useMemo(() => abonos.reduce((sum, abono) => sum + abono.cantidad_abonada, 0), [abonos])
+  const abonosTotales = useMemo(() => abonosFiltrados.reduce((sum, abono) => sum + abono.cantidad_abonada, 0), [abonosFiltrados])
   const valorPromedioVenta = useMemo(() => ventasFiltradas.length > 0 ? ventasTotales / ventasFiltradas.length : 0, [ventasFiltradas, ventasTotales])
   const porcentajeAbonado = useMemo(() => ventasTotales > 0 ? (abonosTotales / ventasTotales) * 100 : 0, [abonosTotales, ventasTotales])
 
@@ -176,14 +230,14 @@ export default function InformesNegocio() {
         datos[mesAno].ventas += venta.price
       }
     })
-    abonos.forEach(abono => {
+    abonosFiltrados.forEach(abono => {
       const fecha = new Date(abono.fecha_abono)
       const mesAno = `${fecha.getMonth() + 1}/${fecha.getFullYear()}`
       if (!datos[mesAno]) datos[mesAno] = { ventas: 0, abonos: 0 }
       datos[mesAno].abonos += abono.cantidad_abonada
     })
     return datos
-  }, [ventas, abonos, citasFiltradas])
+  }, [ventas, abonosFiltrados, citasFiltradas])
 
   const ventasPorTrabajador = useMemo(() => {
     return ventasFiltradas.reduce((acc, venta) => {
@@ -215,18 +269,26 @@ export default function InformesNegocio() {
     ],
   }), [ventasYAbonosMensuales])
 
-  const datosGraficoLineas = useMemo(() => ({
-    labels: abonos.map(abono => new Date(abono.fecha_abono).toLocaleDateString()),
-    datasets: [
-      {
-        label: 'Abonos Diarios',
-        data: abonos.map(abono => abono.cantidad_abonada),
-        fill: false,
-        borderColor: 'rgb(16, 185, 129)',
-        tension: 0.1,
-      },
-    ],
-  }), [abonos])
+  const datosGraficoLineas = useMemo(() => {
+    const abonosDiarios: Record<string, number> = {}
+    abonosFiltrados.forEach(abono => {
+      const fecha = new Date(abono.fecha_abono).toISOString().split('T')[0]
+      abonosDiarios[fecha] = (abonosDiarios[fecha] || 0) + abono.cantidad_abonada
+    })
+    const fechasOrdenadas = Object.keys(abonosDiarios).sort()
+    return {
+      labels: fechasOrdenadas,
+      datasets: [
+        {
+          label: 'Abonos Diarios',
+          data: fechasOrdenadas.map(fecha => abonosDiarios[fecha]),
+          fill: false,
+          borderColor: 'rgb(16, 185, 129)',
+          tension: 0.1,
+        },
+      ],
+    }
+  }, [abonosFiltrados])
 
   const datosGraficoCircular = useMemo(() => {
     const labels: string[] = []
@@ -294,7 +356,7 @@ export default function InformesNegocio() {
 
   const serviciosMasUsados = useMemo(() => {
     const conteoServicios: Record<string, number> = {}
-    ventas.forEach(venta => {
+    ventasFiltradas.forEach(venta => {
       const servicio = servicios.find(s => s.id === parseInt(venta.servicio_id))
       if (servicio) {
         conteoServicios[servicio.name_servicio] = (conteoServicios[servicio.name_servicio] || 0) + 1
@@ -303,7 +365,7 @@ export default function InformesNegocio() {
     return Object.entries(conteoServicios)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-  }, [ventas, servicios])
+  }, [ventasFiltradas, servicios])
 
   const datosGraficoServiciosMasUsados = useMemo(() => ({
     labels: serviciosMasUsados.map(([nombre]) => nombre),
@@ -397,6 +459,25 @@ export default function InformesNegocio() {
       <Header />
       <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">Dashboard de Informes de Negocio</h1>
       <div className="max-w-7xl mx-auto">
+        <div className="mb-6 flex justify-end">
+          <select
+            value={filtroTiempo}
+            onChange={(e) => setFiltroTiempo(e.target.value as FiltroTiempo)}
+            className="block w-full md:w-auto px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium text-gray-700 appearance-none cursor-pointer transition-colors duration-200 ease-in-out hover:bg-gray-50"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+              backgroundPosition: `right 0.5rem center`,
+              backgroundRepeat: `no-repeat`,
+              backgroundSize: `1.5em 1.5em`,
+              paddingRight: `2.5rem`
+            }}
+          >
+            <option value="24h">Últimas 24 horas</option>
+            <option value="semana">Última semana</option>
+            <option value="mes">Último mes</option>
+            <option value="todo">Todo</option>
+          </select>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <motion.div className="bg-white shadow-md rounded-lg p-4" whileHover={{ scale: 1.03 }}>
             <div className="flex items-center">

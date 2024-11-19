@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import supabase from "../../../lib/supabaseClient"
-import { Edit2, Trash2, Search, Plus, Home } from "lucide-react"
+import { Edit2, Trash2, Search, Plus, Home } from 'lucide-react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 
@@ -15,7 +15,9 @@ interface Cliente {
   rut: string
 }
 
-function Header() {
+function Header({ userRole }: { userRole: string }) {
+  const homeLink = userRole === 'admin' ? '/jefe' : '/trabajador'
+
   return (
     <motion.header 
       initial={{ opacity: 0, y: -50 }}
@@ -41,7 +43,7 @@ function Header() {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+        <Link href={homeLink} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
           <Home size={24} />
           <span className="hidden sm:inline">Volver al Menú</span>
         </Link>
@@ -56,6 +58,7 @@ const GestionClientes = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [editedCliente, setEditedCliente] = useState<Cliente | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>('')
   const router = useRouter()
 
   const fetchClientes = async () => {
@@ -92,7 +95,20 @@ const GestionClientes = () => {
 
         if (!session) {
           router.push("/login")
+          return
         }
+
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('email', session.user.email)
+          .single()
+
+        if (userError) {
+          throw userError
+        }
+
+        setUserRole(userData.role)
       } catch (error) {
         console.error("Error al obtener la sesión del usuario:", error)
         setError("Error de autenticación. Por favor, inicie sesión de nuevo.")
@@ -102,7 +118,7 @@ const GestionClientes = () => {
 
     checkUser()
     fetchClientes()
-  }, [router]) // Solo dependemos de router
+  }, [router])
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value)
@@ -151,8 +167,8 @@ const GestionClientes = () => {
         throw error;
       }
 
-      setEditedCliente(null); // Limpiar el estado después de la actualización
-      await fetchClientes(); // Refrescar la lista de clientes
+      setEditedCliente(null);
+      await fetchClientes();
     } catch (error) {
       console.error("Error al actualizar el cliente:", error);
       setError("Error al actualizar el cliente. Por favor, intente de nuevo.");
@@ -162,7 +178,7 @@ const GestionClientes = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="py-12 px-4 sm:px-6 lg:px-8">
-        <Header />
+        <Header userRole={userRole} />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -259,7 +275,6 @@ const GestionClientes = () => {
               </div>
             )}
 
-            {/* Formulario de edición */}
             {editedCliente && (
               <div className="mt-8 p-6 bg-gray-100 rounded-lg">
                 <h2 className="text-2xl font-bold mb-4">Editar Cliente</h2>

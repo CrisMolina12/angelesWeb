@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '../../../lib/supabaseClient'
-import { LogOut, Home } from 'lucide-react'
+import { LogOut, Home, PlusCircle } from 'lucide-react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
@@ -14,31 +14,31 @@ function Header() {
       initial={{ opacity: 0, y: -50 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md mb-6 rounded-lg"
+      className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-lg"
     >
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-4">
         <Image
           src="/Imagen1.png" 
           alt="Logo de Angeles"
-          width={32}
-          height={32}
-          className="rounded-full border border-white shadow-sm"
+          width={48}
+          height={48}
+          className="rounded-full border-2 border-white shadow-md"
         />
         <motion.span 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-lg font-bold tracking-wide"
+          className="text-2xl font-bold tracking-wide"
         >
           Angeles
         </motion.span>
       </div>
-      <div className="flex items-center space-x-2">
-      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+      <nav className="flex items-center space-x-6">
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
           <Home size={24} />
-          <span className="hidden sm:inline">Volver al Menú</span>
+          <span className="hidden sm:inline">Inicio</span>
         </Link>
-      </div>
+      </nav>
     </motion.header>
   )
 }
@@ -234,12 +234,15 @@ export default function AdminDashboard() {
               {successMessage && (
                 <div className="text-green-600">{successMessage}</div>
               )}
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 type="submit"
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 rounded-lg transition-colors duration-200"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 rounded-lg transition-colors duration-200 flex items-center justify-center"
               >
+                <PlusCircle className="mr-2" size={20} />
                 Crear Usuario
-              </button>
+              </motion.button>
             </form>
           </div>
         </motion.div>

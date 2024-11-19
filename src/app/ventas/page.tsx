@@ -6,7 +6,7 @@ import supabase from "../../../lib/supabaseClient"
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DollarSign, FileText, User, Check, X, Package, ChevronLeft, ChevronRight, Plus, Minus, Home, PlusCircle, Calendar } from 'lucide-react'
-import Link from 'next/link'
+
 
 type SaleFormData = {
   rut: string
@@ -468,8 +468,11 @@ export default function RegistrarVenta() {
   const handleVolverAlMenu = () => {
     if (userRole === 'admin') {
       router.push('/jefe')
-    } else {
+    } else if (userRole === 'worker') {
       router.push('/trabajador')
+    } else {
+      // If for some reason the role is not set, redirect to a default page
+      router.push('/')
     }
   }
 
@@ -530,10 +533,10 @@ export default function RegistrarVenta() {
             </motion.span>
           </div>
           <div className="flex items-center space-x-4">
-            <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+            <button onClick={handleVolverAlMenu} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
               <Home size={24} />
               <span className="hidden sm:inline">Volver al Menú</span>
-            </Link>
+            </button>
           </div>
         </motion.header>
         <motion.div 

@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Calendar, DollarSign, UserPlus, BarChart2, FileText, LogOut,  Menu, Briefcase, Eye, Clock } from 'lucide-react'
+import { Users, Calendar, DollarSign, UserPlus, BarChart2, FileText, LogOut, Briefcase, Eye, Clock, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import supabase from '../../../lib/supabaseClient'
 
-function Header({ onLogout }: { onLogout: () => void }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-
+function Header() {
   return (
     <motion.header 
       initial={{ opacity: 0, y: -50 }}
@@ -33,30 +31,6 @@ function Header({ onLogout }: { onLogout: () => void }) {
         >
           Angeles
         </motion.span>
-      </div>
-      <div className="flex items-center space-x-4">
-        <div className="relative">
-          <button 
-            className="text-white hover:text-gray-200 transition-colors"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            <Menu size={24} />
-          </button>
-          {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md overflow-hidden shadow-xl z-10">
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false)
-                  onLogout()
-                }}
-                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-              >
-                <LogOut className="inline-block mr-2 h-4 w-4" />
-                Cerrar Sesión
-              </button>
-            </div>
-          )}
-        </div>
       </div>
     </motion.header>
   )
@@ -211,6 +185,12 @@ export default function Dashboard() {
       description: "Mira las ventas que estan activas e inactivas.",
       icon: <Eye className="h-8 w-8 text-white" />,
       link: "/verventas"
+    },
+    {
+      title: "Tipos de Pago",
+      description: "Gestionar los tipos de pago disponibles.",
+      icon: <CreditCard className="h-8 w-8 text-white" />,
+      link: "/pagos"
     }
   ]
 
@@ -219,7 +199,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <Header onLogout={handleLogout} />
+        <Header />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

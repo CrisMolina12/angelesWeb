@@ -7,7 +7,7 @@ import moment from 'moment'
 import 'moment/locale/es'
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronLeft, ChevronRight, Edit2, Home,Trash2, X, Check, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Edit2, Home, Trash2, X, Check, Search } from 'lucide-react'
 import Link from 'next/link'
 moment.locale('es')
 
@@ -21,7 +21,9 @@ interface EventoCalendario {
   venta_id?: number
 }
 
-function Header() {
+function Header({ userRole }: { userRole: string }) {
+  const homeLink = userRole === 'admin' ? '/jefe' : '/trabajador'
+
   return (
     <motion.header 
       initial={{ opacity: 0, y: -50 }}
@@ -46,10 +48,10 @@ function Header() {
           Angeles
         </motion.span>
       </div>
-      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
-          <Home size={24} />
-          <span className="hidden sm:inline">Volver al Menú</span>
-        </Link>
+      <Link href={homeLink} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+        <Home size={24} />
+        <span className="hidden sm:inline">Volver al Menú</span>
+      </Link>
     </motion.header>
   )
 }
@@ -63,6 +65,7 @@ export default function CalendarioCitas() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filteredEvents, setFilteredEvents] = useState<EventoCalendario[]>([])
   const [view, setView] = useState<'month' | 'week' | 'day'>('month')
+  const [userRole, setUserRole] = useState<string>('')
   const router = useRouter()
 
   useEffect(() => {
@@ -70,7 +73,21 @@ export default function CalendarioCitas() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         router.push('/login')
+        return
       }
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('email', session.user.email)
+        .single()
+
+      if (userError) {
+        console.error("Error fetching user role:", userError)
+        return
+      }
+
+      setUserRole(userData.role)
     }
     checkAuth()
   }, [router])
@@ -339,7 +356,7 @@ export default function CalendarioCitas() {
   return (
     <div className="min-h-screen bg-gray-100 p-2 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        <Header />
+        <Header userRole={userRole} />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
