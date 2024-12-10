@@ -298,7 +298,8 @@ export default function RegistrarVenta() {
         description: saleFormData.descripcion,
         id_tipo_pago: tipoPagoId,
         fecha_transaccion: new Date().toISOString(),
-        servicio_id: saleFormData.detalles[0].servicioId
+        servicio_id: saleFormData.detalles[0].servicioId,
+        id_estado_venta: 1  // Establecemos automáticamente el estado de la venta a 1
       }).select('*').single()
 
       if (errorVenta) throw errorVenta

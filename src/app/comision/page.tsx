@@ -91,14 +91,12 @@ function Header() {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60 * 1000);
-  return localDate.toLocaleString('es-ES', {
+  // Ajustamos la fecha a la zona horaria de Chile (UTC-4)
+  const chileanDate = new Date(date.getTime() + (4 * 60 * 60 * 1000));
+  return chileanDate.toLocaleDateString('es-CL', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
     timeZone: 'UTC'
   });
 };
@@ -359,7 +357,7 @@ export default function ComisionesTable() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">ID Venta</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Fecha de Abono</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Comisiones</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Abonos</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Abonos y Tipo Pago</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -388,7 +386,7 @@ export default function ComisionesTable() {
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {venta.abonos.map((abono, abonoIndex) => (
                             <div key={`abono-${venta.id_venta || index}-${abono.id || abonoIndex}`} className={abonoIndex > 0 ? 'mt-2' : ''}>
-                              ${Math.round(abono.cantidad_abonada)} - {formatDate(abono.fecha_abono)} - {abono.id_tipo_pago}
+                              ${Math.round(abono.cantidad_abonada)} - {abono.id_tipo_pago}
                             </div>
                           ))}
                         </td>
