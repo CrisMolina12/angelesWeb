@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from 'framer-motion'
-import { Home, Search, Edit, Trash2, Eye, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react'
+import { Home, Search, Edit, Eye, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react'
 
 type Venta = {
   id: number
@@ -18,12 +18,14 @@ type Venta = {
   client_name: string
   worker_name: string
   service_name: string
-  is_active: boolean
-  next_appointment: string | null
   total_paid: number
   appointment_count: number
   id_tipo_pago: number
   tipo_pago?: TipoPago
+  percent_comision: number
+  id_estado_venta: number
+  estado_venta?: EstadoVenta
+  citas?: { service_date: string; start_time: string }[]
 }
 
 type NewPayment = {
@@ -38,10 +40,45 @@ type TipoPago = {
   porcentaje: number
 }
 
-type Cita = {
-  id: number
-  service_date: string
-  start_time: string
+type EstadoVenta = {
+  id_estado_venta: number
+  nombre: string
+}
+
+function Header() {
+  return (
+    <motion.header 
+      initial={{ opacity: 0, y: -50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-4 sm:mb-8 rounded-2xl"
+    >
+      <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+        <Image
+          src="/Imagen1.png"
+          alt="Logo de Angeles"
+          width={50}
+          height={50}
+          className="rounded-full border-2 border-white shadow-md"
+        />
+        <motion.span 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="text-2xl font-bold tracking-wide"
+        >
+          Angeles
+        </motion.span>
+      </div>
+      
+      <div className="flex items-center space-x-4">
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+          <Home size={24} />
+          <span className="hidden sm:inline">Volver al Menú</span>
+        </Link>
+      </div>
+    </motion.header>
+  )
 }
 
 export default function VentasActivas() {
@@ -49,7 +86,8 @@ export default function VentasActivas() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPageActive, setCurrentPageActive] = useState(1)
+  const [currentPageFinalized, setCurrentPageFinalized] = useState(1)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -59,18 +97,14 @@ export default function VentasActivas() {
     amount: 0,
     id_tipo_pago: 0
   })
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [tiposPago, setTiposPago] = useState<TipoPago[]>([])
+  const [estadosVenta, setEstadosVenta] = useState<EstadoVenta[]>([])
+  const [activeTab, setActiveTab] = useState<'Activo' | 'Finalizada'>('Activo')
   const router = useRouter()
   
   const ventasPorPagina = 10
 
-  useEffect(() => {
-    checkUserRole()
-    fetchTiposPago()
-  }, [])
-
-  const checkUserRole = async () => {
+  const checkUserRole = useCallback(async () => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -91,13 +125,18 @@ export default function VentasActivas() {
         return
       }
 
-      setUserRole(userData.role)
       fetchVentas()
     } catch (error) {
       console.error('Error al verificar el rol del usuario:', error)
       setError('Error al verificar el rol del usuario')
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    checkUserRole()
+    fetchTiposPago()
+    fetchEstadosVenta()
+  }, [checkUserRole])
 
   const fetchTiposPago = async () => {
     try {
@@ -114,60 +153,82 @@ export default function VentasActivas() {
     }
   }
 
+  const fetchEstadosVenta = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('estado_de_venta')
+        .select('*')
+
+      if (error) throw error
+
+      setEstadosVenta(data)
+    } catch (error) {
+      console.error('Error al obtener los estados de venta:', error)
+      setError('Error al obtener los estados de venta')
+    }
+  }
+
   const fetchVentas = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       const { data, error } = await supabase
         .from('ventas')
         .select(`
           *,
           clients (name),
-          users (name),
+          users (name, porcent_comision),
           servicios (name_servicio),
           citas (id, service_date, start_time),
           abono (cantidad_abonada),
-          tipo_pago (id_tipo_pago, name_comision, porcentaje)
-        `)
+          tipo_pago (id_tipo_pago, name_comision, porcentaje),
+          estado_de_venta (id_estado_venta, nombre)
+        `);
 
       if (error) {
-        console.error('Error de Supabase:', error)
-        throw new Error(`Error al obtener las ventas: ${error.message}`)
+        console.error('Error de Supabase:', error);
+        throw new Error(`Error al obtener las ventas: ${error.message}`);
       }
 
       if (!data) {
-        throw new Error('No se recibieron datos de Supabase')
+        throw new Error('No se recibieron datos de Supabase');
       }
 
-      const ventasFormateadas = data
-        .filter(venta => venta.tipo_pago !== null)
-        .map(venta => {
-          const totalPaid = venta.abono ? venta.abono.reduce((sum: number, abono: { cantidad_abonada: number }) => sum + abono.cantidad_abonada, 0) : 0
-          const futureCitas = (venta.citas as Cita[])
-            .filter(cita => new Date(`${cita.service_date}T${cita.start_time}`) > new Date())
-            .sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
-          
-          return {
-            ...venta,
-            client_name: venta.clients?.name || 'Cliente desconocido',
-            worker_name: venta.users?.name || 'Trabajador desconocido',
-            service_name: venta.servicios?.name_servicio || 'Servicio desconocido',
-            is_active: futureCitas.length > 0,
-            next_appointment: futureCitas.length > 0 ? `${futureCitas[0].service_date} ${futureCitas[0].start_time}` : null,
-            total_paid: totalPaid,
-            appointment_count: venta.citas ? venta.citas.length : 0,
-            id_tipo_pago: venta.tipo_pago?.id_tipo_pago,
-            tipo_pago: venta.tipo_pago
-          }
-        })
-      setVentas(ventasFormateadas)
+      const ventasFormateadas = data.map(venta => {
+        const totalPaid = venta.abono 
+          ? venta.abono.reduce((sum: number, abono: { cantidad_abonada: number }) => sum + abono.cantidad_abonada, 0) 
+          : 0;
+        
+        // Ordenar las citas por fecha
+        const citasOrdenadas = venta.citas ? [...venta.citas].sort((a, b) => 
+          new Date(a.service_date + ' ' + a.start_time).getTime() - 
+          new Date(b.service_date + ' ' + b.start_time).getTime()
+        ) : [];
+        
+        return {
+          ...venta,
+          client_name: venta.clients?.name || 'Cliente desconocido',
+          worker_name: venta.users?.name || 'Trabajador desconocido',
+          service_name: venta.servicios?.name_servicio || 'Servicio desconocido',
+          total_paid: totalPaid,
+          appointment_count: citasOrdenadas.length,
+          id_tipo_pago: venta.tipo_pago?.id_tipo_pago,
+          tipo_pago: venta.tipo_pago,
+          percent_comision: venta.users?.porcent_comision || 0,
+          id_estado_venta: venta.estado_de_venta?.id_estado_venta,
+          estado_venta: venta.estado_de_venta,
+          citas: citasOrdenadas
+        };
+      });
+
+      setVentas(ventasFormateadas);
     } catch (error) {
-      console.error('Error en fetchVentas:', error)
-      setError(error instanceof Error ? error.message : 'Ocurrió un error desconocido')
+      console.error('Error en fetchVentas:', error);
+      setError(error instanceof Error ? error.message : 'Ocurrió un error desconocido');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleEditVenta = (venta: Venta) => {
     setSelectedVenta(venta)
@@ -184,7 +245,8 @@ export default function VentasActivas() {
         .update({
           price: selectedVenta.price,
           description: selectedVenta.description,
-          id_tipo_pago: selectedVenta.id_tipo_pago
+          id_tipo_pago: selectedVenta.id_tipo_pago,
+          id_estado_venta: selectedVenta.id_estado_venta
         })
         .eq('id', selectedVenta.id)
 
@@ -196,27 +258,6 @@ export default function VentasActivas() {
     } catch (error) {
       console.error('Error al actualizar la venta:', error)
       alert('Hubo un error al actualizar la venta. Por favor, inténtalo de nuevo.')
-    }
-  }
-
-  const handleDeleteVenta = async (id: number) => {
-    const isConfirmed = window.confirm('¿Estás seguro de que quieres eliminar esta venta?')
-    
-    if (isConfirmed) {
-      try {
-        const { error } = await supabase
-          .from('ventas')
-          .delete()
-          .eq('id', id)
-
-        if (error) throw error
-
-        fetchVentas()
-        alert('Venta eliminada con éxito.')
-      } catch (error) {
-        console.error('Error al eliminar la venta:', error)
-        alert('Hubo un error al eliminar la venta. Por favor, inténtalo de nuevo.')
-      }
     }
   }
 
@@ -251,7 +292,7 @@ export default function VentasActivas() {
     }
 
     try {
-      const { data: abonoData, error: abonoError } = await supabase
+      const { error: abonoError } = await supabase
         .from('abono')
         .insert({
           ventas_id_venta: newPayment.ventas_id_venta,
@@ -259,14 +300,11 @@ export default function VentasActivas() {
           fecha_abono: new Date().toISOString(),
           id_tipo_pago: newPayment.id_tipo_pago
         })
-        .select()
 
       if (abonoError) {
         console.error('Error al insertar abono:', abonoError)
         throw abonoError
       }
-
-      console.log('Abono insertado con éxito:', abonoData)
 
       const tipoPago = tiposPago.find(tp => tp.id_tipo_pago === newPayment.id_tipo_pago)
       if (!tipoPago) {
@@ -276,11 +314,9 @@ export default function VentasActivas() {
       }
 
       const montoConPorcentajeTipoPago = newPayment.amount * (1 - tipoPago.porcentaje / 100)
-      const comision = Math.round(montoConPorcentajeTipoPago * 0.1)
+      const comision = Math.round(montoConPorcentajeTipoPago * (selectedVenta.percent_comision / 100))
 
-      console.log('Comisión calculada:', comision)
-
-      const { data: comisionData, error: comisionError } = await supabase
+      const { error: comisionError } = await supabase
         .from('comision')
         .insert({
           ventas_id_venta: selectedVenta.id,
@@ -288,14 +324,11 @@ export default function VentasActivas() {
           monto_comision: comision,
           fecha_comision: new Date().toISOString()
         })
-        .select()
 
       if (comisionError) {
         console.error('Error al insertar comisión:', comisionError)
         throw comisionError
       }
-
-      console.log('Comisión insertada con éxito:', comisionData)
 
       setShowPaymentModal(false)
       fetchVentas()
@@ -306,24 +339,53 @@ export default function VentasActivas() {
     }
   }
 
+  const handleChangeEstado = async (ventaId: number, nuevoEstadoId: number) => {
+    try {
+      const { error } = await supabase
+        .from('ventas')
+        .update({ id_estado_venta: nuevoEstadoId })
+        .eq('id', ventaId)
+
+      if (error) throw error
+
+      setVentas(ventas.map(venta => 
+        venta.id === ventaId 
+          ? { ...venta, id_estado_venta: nuevoEstadoId, estado_venta: estadosVenta.find(e => e.id_estado_venta === nuevoEstadoId) } 
+          : venta
+      ))
+
+      alert('Estado de venta actualizado con éxito.')
+    } catch (error) {
+      console.error('Error al actualizar el estado de la venta:', error)
+      alert('Hubo un error al actualizar el estado de la venta. Por favor, inténtalo de nuevo.')
+    }
+  }
+
   const ventasFiltradas = ventas.filter(venta =>
-    venta.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.worker_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.service_name.toLowerCase().includes(searchTerm.toLowerCase())
+    (venta.client_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (venta.worker_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (venta.service_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   )
 
-  const ventasActivas = ventasFiltradas.filter(venta => venta.is_active)
-  const ventasInactivas = ventasFiltradas.filter(venta => !venta.is_active)
+  const ventasActivas = ventasFiltradas.filter(venta => venta.id_estado_venta === 1)
+  const ventasFinalizadas = ventasFiltradas.filter(venta => venta.id_estado_venta === 2)
 
-  const indexOfLastVentaActiva = currentPage * ventasPorPagina
+  const indexOfLastVentaActiva = currentPageActive * ventasPorPagina
   const indexOfFirstVentaActiva = indexOfLastVentaActiva - ventasPorPagina
+  const currentVentasActivas = ventasActivas.slice(indexOfFirstVentaActiva, indexOfLastVentaActiva)
 
-  const indexOfLastVentaInactiva = currentPage * ventasPorPagina
-  const indexOfFirstVentaInactiva = indexOfLastVentaInactiva - ventasPorPagina
+  const indexOfLastVentaFinalizada = currentPageFinalized * ventasPorPagina
+  const indexOfFirstVentaFinalizada = indexOfLastVentaFinalizada - ventasPorPagina
+  const currentVentasFinalizadas = ventasFinalizadas.slice(indexOfFirstVentaFinalizada, indexOfLastVentaFinalizada)
 
-  const pageNumbers = []
-  for (let i = 1; i <= Math.ceil((ventasActivas.length + ventasInactivas.length) / ventasPorPagina); i++) {
-    pageNumbers.push(i)
+  const pageNumbersActive = []
+  for (let i = 1; i <= Math.ceil(ventasActivas.length / ventasPorPagina); i++) {
+    pageNumbersActive.push(i)
+  }
+
+  const pageNumbersFinalized = []
+  for (let i = 1; i <= Math.ceil(ventasFinalizadas.length / ventasPorPagina); i++) {
+    pageNumbersFinalized.push(i)
   }
 
   const formatCurrency = (amount: number) => {
@@ -335,57 +397,104 @@ export default function VentasActivas() {
     })
   }
 
-  const renderVentasTable = (ventas: Venta[]) => (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trabajador</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pagado</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Citas</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Cita</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {ventas.map((venta) => (
-            <tr key={venta.id}>
-              <td className="px-6 py-4 whitespace-nowrap">{venta.client_name}</td>
-              <td className="px-6 py-4 whitespace-nowrap">{venta.worker_name}</td>
-              <td className="px-6 py-4 whitespace-nowrap">{venta.service_name}</td>
-              <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(venta.price)}</td>
-              <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(venta.total_paid)}</td>
-              <td className="px-6 py-4 whitespace-nowrap">{venta.appointment_count}</td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                {venta.next_appointment 
-                  ? new Date(venta.next_appointment).toLocaleString()
-                  : 'No hay citas futuras'}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <button onClick={() => handleViewDetails(venta)} className="text-indigo-600 hover:text-indigo-900 mr-2">
-                  <Eye size={20} />
-                </button>
-                <button onClick={() => handleEditVenta(venta)} className="text-yellow-600 hover:text-yellow-900 mr-2">
-                  <Edit size={20} />
-                </button>
-                <button onClick={() => handleDeleteVenta(venta.id)} className="text-red-600 hover:text-red-900 mr-2">
-                  <Trash2 size={20} />
-                </button>
-                <button 
-                  onClick={() => handleAddPayment(venta)} 
-                  className="text-green-600 hover:text-green-900 flex items-center"
-                >
-                  <DollarSign size={20} className="mr-1" />
-                  <span>Abonar</span>
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  const renderVentasTable = (ventas: Venta[], title: string) => (
+    <div className="mb-8">
+      <h3 className={`text-2xl font-bold mb-4 ${
+        title === 'Activo' ? 'text-green-600' : 'text-gray-600'
+      }`}>{title}</h3>
+      {ventas.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Venta</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trabajador</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pagado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Citas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Cita</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {ventas.map((venta) => (
+                <tr key={venta.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <select
+                      value={venta.id_estado_venta}
+                      onChange={(e) => handleChangeEstado(venta.id, parseInt(e.target.value, 10))}
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        venta.id_estado_venta === 1
+                          ? 'bg-green-100 text-green-800'
+                          : venta.id_estado_venta === 2
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
+                      {estadosVenta.map((estado) => (
+                        <option key={estado.id_estado_venta} value={estado.id_estado_venta}>
+                          {estado.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{venta.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{venta.client_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{venta.worker_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{venta.service_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(venta.price)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(venta.total_paid)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{venta.appointment_count}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {venta.citas && venta.citas.length > 0
+                      ? (() => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const futureCitas = venta.citas.filter(cita => {
+                            const citaDate = new Date(cita.service_date + ' ' + cita.start_time);
+                            return citaDate >= today;
+                          });
+                          if (futureCitas.length > 0) {
+                            const nextCita = futureCitas[0];
+                            return new Date(nextCita.service_date + ' ' + nextCita.start_time).toLocaleString('es-CL', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                          } else {
+                            return 'No hay citas programadas';
+                          }
+                        })()
+                      : 'No hay citas programadas'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onClick={() => handleViewDetails(venta)} className="text-indigo-600 hover:text-indigo-900 mr-2">
+                      <Eye size={20} />
+                    </button>
+                    <button onClick={() => handleEditVenta(venta)} className="text-yellow-600 hover:text-yellow-900 mr-2">
+                      <Edit size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleAddPayment(venta)} 
+                      className="text-green-600 hover:text-green-900 flex items-center"
+                    >
+                      <DollarSign size={20} className="mr-1" />
+                      <span>Abonar</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-gray-600">No hay ventas {title.toLowerCase()}s en este momento.</p>
+      )}
     </div>
   )
 
@@ -421,37 +530,7 @@ export default function VentasActivas() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <motion.header 
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
-        >
-          <div className="flex items-center space-x-4">
-            <Image
-              src="/Imagen1.png" 
-              alt="Logo de Angeles"
-              width={50}
-              height={50}
-              className="rounded-full border-2 border-white shadow-md"
-            />
-            <motion.span 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="text-2xl font-bold tracking-wide"
-            >
-              Angeles - Ventas
-            </motion.span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link href={userRole === 'admin' ? '/jefe' : '/trabajador'} className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
-              <Home size={24} />
-              <span className="hidden sm:inline">Volver al Menú</span>
-            </Link>
-          </div>
-        </motion.header>
-
+        <Header />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -473,58 +552,112 @@ export default function VentasActivas() {
               </div>
             </div>
 
-            {ventasActivas.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold mb-4 text-green-600">Ventas con Citas Pendientes</h3>
-                {renderVentasTable(ventasActivas.slice(indexOfFirstVentaActiva, indexOfLastVentaActiva))}
-              </div>
-            )}
-
-            {ventasInactivas.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold mb-4 text-gray-600">Ventas sin Citas Pendientes</h3>
-                {renderVentasTable(ventasInactivas.slice(indexOfFirstVentaInactiva, indexOfLastVentaInactiva))}
-              </div>
-            )}
-
-            <div className="mt-6 flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{indexOfFirstVentaActiva + 1}</span> a{' '}
-                  <span className="font-medium">
-                    {Math.min(indexOfLastVentaActiva, ventasActivas.length + ventasInactivas.length)}
-                  </span>{' '}
-                  de <span className="font-medium">{ventasActivas.length + ventasInactivas.length}</span> resultados
-                </p>
-              </div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span className="sr-only">Anterior</span>
-                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                </button>
-                {pageNumbers.map(number => (
-                  <button
-                    key={number}
-                    onClick={() => setCurrentPage(number)}
-                    className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
-                      currentPage === number ? '!bg-purple-600 !text-white' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {number}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageNumbers.length))}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span className="sr-only">Siguiente</span>
-                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                </button>
-              </nav>
+            <div className="mb-6">
+              <button
+                onClick={() => setActiveTab('Activo')}
+                className={`px-4 py-2 mr-2 rounded-md ${
+                  activeTab === 'Activo' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Ventas Activas
+              </button>
+              <button
+                onClick={() => setActiveTab('Finalizada')}
+                className={`px-4 py-2 rounded-md ${
+                  activeTab === 'Finalizada' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Ventas Finalizadas
+              </button>
             </div>
+
+            {activeTab === 'Activo' && (
+              <>
+                {renderVentasTable(currentVentasActivas, "Activo")}
+                <div className="mt-6 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Mostrando <span className="font-medium">{indexOfFirstVentaActiva + 1}</span> a{' '}
+                      <span className="font-medium">
+                        {Math.min(indexOfLastVentaActiva, ventasActivas.length)}
+                      </span>{' '}
+                      de <span className="font-medium">{ventasActivas.length}</span> resultados
+                    </p>
+                  </div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={() => setCurrentPageActive(prev => Math.max(prev - 1, 1))}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    >
+                      <span className="sr-only">Anterior</span>
+                      <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                    {pageNumbersActive.map(number => (
+                      <button
+                        key={number}
+                        onClick={() => setCurrentPageActive(number)}
+                        className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
+                          currentPageActive === number ? '!bg-purple-600 !text-white' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {number}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCurrentPageActive(prev => Math.min(prev + 1, pageNumbersActive.length))}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    >
+                      <span className="sr-only">Siguiente</span>
+                      <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </nav>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'Finalizada' && (
+              <>
+                {renderVentasTable(currentVentasFinalizadas, "Finalizada")}
+                <div className="mt-6 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Mostrando <span className="font-medium">{indexOfFirstVentaFinalizada + 1}</span> a{' '}
+                      <span className="font-medium">
+                        {Math.min(indexOfLastVentaFinalizada, ventasFinalizadas.length)}
+                      </span>{' '}
+                      de <span className="font-medium">{ventasFinalizadas.length}</span> resultados
+                    </p>
+                  </div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={() => setCurrentPageFinalized(prev => Math.max(prev - 1, 1))}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    >
+                      <span className="sr-only">Anterior</span>
+                      <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                    {pageNumbersFinalized.map(number => (
+                      <button
+                        key={number}
+                        onClick={() => setCurrentPageFinalized(number)}
+                        className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
+                          currentPageFinalized === number ? '!bg-purple-600 !text-white' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {number}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCurrentPageFinalized(prev => Math.min(prev + 1, pageNumbersFinalized.length))}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    >
+                      <span className="sr-only">Siguiente</span>
+                      <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </nav>
+                </div>
+              </>
+            )}
           </div>
         </motion.div>
       </div>
@@ -553,8 +686,8 @@ export default function VentasActivas() {
                 <p><span className="font-medium">Restante:</span> {formatCurrency(selectedVenta.price - selectedVenta.total_paid)}</p>
                 <p><span className="font-medium">Número de Citas:</span> {selectedVenta.appointment_count}</p>
                 <p><span className="font-medium">Descripción:</span> {selectedVenta.description}</p>
-                <p><span className="font-medium">Próxima Cita:</span> {selectedVenta.next_appointment ? new Date(selectedVenta.next_appointment).toLocaleString() : 'No hay citas futuras'}</p>
                 <p><span className="font-medium">Tipo de Pago:</span> {selectedVenta.tipo_pago ? selectedVenta.tipo_pago.name_comision : 'No especificado'}</p>
+                <p><span className="font-medium">Estado de la Venta:</span> {selectedVenta.estado_venta ? selectedVenta.estado_venta.nombre : 'No especificado'}</p>
               </div>
               <div className="mt-6 flex justify-end">
                 <button
@@ -584,7 +717,7 @@ export default function VentasActivas() {
               className="bg-white rounded-lg p-6 w-full max-w-md"
             >
               <h3 className="text-lg font-medium mb-4">Editar Venta</h3>
-              <form onSubmit={handleUpdateVenta} className="space-y-4">
+              <form onSubmit={handleUpdateVenta} className="spacey-4">
                 <div>
                   <label htmlFor="price" className="block text-sm font-medium text-gray-700">Precio</label>
                   <input
@@ -716,3 +849,4 @@ export default function VentasActivas() {
     </div>
   )
 }
+

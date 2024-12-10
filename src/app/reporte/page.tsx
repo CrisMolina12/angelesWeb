@@ -214,10 +214,10 @@ export default function InformesNegocio() {
     [citas, ventas, filtroTiempo]
   )
 
-  const ventasTotales = useMemo(() => ventasFiltradas.reduce((sum, venta) => sum + venta.price, 0), [ventasFiltradas])
-  const abonosTotales = useMemo(() => abonosFiltrados.reduce((sum, abono) => sum + abono.cantidad_abonada, 0), [abonosFiltrados])
-  const valorPromedioVenta = useMemo(() => ventasFiltradas.length > 0 ? ventasTotales / ventasFiltradas.length : 0, [ventasFiltradas, ventasTotales])
-  const porcentajeAbonado = useMemo(() => ventasTotales > 0 ? (abonosTotales / ventasTotales) * 100 : 0, [abonosTotales, ventasTotales])
+  const ventasTotales = useMemo(() => Math.round(ventasFiltradas.reduce((sum, venta) => sum + venta.price, 0)), [ventasFiltradas])
+  const abonosTotales = useMemo(() => Math.round(abonosFiltrados.reduce((sum, abono) => sum + abono.cantidad_abonada, 0)), [abonosFiltrados])
+  const valorPromedioVenta = useMemo(() => ventasFiltradas.length > 0 ? Math.round(ventasTotales / ventasFiltradas.length) : 0, [ventasFiltradas, ventasTotales])
+  const porcentajeAbonado = useMemo(() => ventasTotales > 0 ? Math.round((abonosTotales / ventasTotales) * 100) : 0, [abonosTotales, ventasTotales])
 
   const ventasYAbonosMensuales = useMemo(() => {
     const datos: Record<string, { ventas: number, abonos: number }> = {}
@@ -227,14 +227,14 @@ export default function InformesNegocio() {
         const fecha = new Date(cita.service_date)
         const mesAno = `${fecha.getMonth() + 1}/${fecha.getFullYear()}`
         if (!datos[mesAno]) datos[mesAno] = { ventas: 0, abonos: 0 }
-        datos[mesAno].ventas += venta.price
+        datos[mesAno].ventas += Math.round(venta.price)
       }
     })
     abonosFiltrados.forEach(abono => {
       const fecha = new Date(abono.fecha_abono)
       const mesAno = `${fecha.getMonth() + 1}/${fecha.getFullYear()}`
       if (!datos[mesAno]) datos[mesAno] = { ventas: 0, abonos: 0 }
-      datos[mesAno].abonos += abono.cantidad_abonada
+      datos[mesAno].abonos += Math.round(abono.cantidad_abonada)
     })
     return datos
   }, [ventas, abonosFiltrados, citasFiltradas])
@@ -242,7 +242,7 @@ export default function InformesNegocio() {
   const ventasPorTrabajador = useMemo(() => {
     return ventasFiltradas.reduce((acc, venta) => {
       const workerId = venta.worker_id_integer?.toString() || 'Sin asignar'
-      acc[workerId] = (acc[workerId] || 0) + venta.price
+      acc[workerId] = Math.round((acc[workerId] || 0) + venta.price)
       return acc
     }, {} as Record<string, number>)
   }, [ventasFiltradas])
@@ -273,7 +273,7 @@ export default function InformesNegocio() {
     const abonosDiarios: Record<string, number> = {}
     abonosFiltrados.forEach(abono => {
       const fecha = new Date(abono.fecha_abono).toISOString().split('T')[0]
-      abonosDiarios[fecha] = (abonosDiarios[fecha] || 0) + abono.cantidad_abonada
+      abonosDiarios[fecha] = Math.round((abonosDiarios[fecha] || 0) + abono.cantidad_abonada)
     })
     const fechasOrdenadas = Object.keys(abonosDiarios).sort()
     return {
@@ -299,7 +299,7 @@ export default function InformesNegocio() {
         ? 'Trabajador Sin asignar' 
         : trabajadoresMap.get(id) || `Trabajador ${id.substring(0, 8)}...`
       labels.push(nombre)
-      data.push(ventas)
+      data.push(Math.round(ventas))
     })
 
     return {
@@ -487,7 +487,7 @@ export default function InformesNegocio() {
               <div className="ml-3 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Total Ventas</dt>
-                  <dd className="text-lg font-semibold text-gray-900">${ventasTotales.toFixed(2)}</dd>
+                  <dd className="text-lg font-semibold text-gray-900">${ventasTotales}</dd>
                 </dl>
               </div>
             </div>
@@ -501,7 +501,7 @@ export default function InformesNegocio() {
               <div className="ml-3 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Total Abonos</dt>
-                  <dd className="text-lg font-semibold text-gray-900">${abonosTotales.toFixed(2)}</dd>
+                  <dd className="text-lg font-semibold text-gray-900">${abonosTotales}</dd>
                 </dl>
               </div>
             </div>
@@ -515,7 +515,7 @@ export default function InformesNegocio() {
               <div className="ml-3 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Promedio Venta</dt>
-                  <dd className="text-lg font-semibold text-gray-900">${valorPromedioVenta.toFixed(2)}</dd>
+                  <dd className="text-lg font-semibold text-gray-900">${valorPromedioVenta}</dd>
                 </dl>
               </div>
             </div>
@@ -578,7 +578,7 @@ export default function InformesNegocio() {
               <Bar data={datosGraficoBarrasApiladas} options={chartOptions} />
             </div>
             <div className="mt-2 text-center">
-              <p className="text-lg font-semibold">{porcentajeAbonado.toFixed(2)}% del total ha sido abonado</p>
+              <p className="text-lg font-semibold">{porcentajeAbonado}% del total ha sido abonado</p>
             </div>
           </motion.div>
         </div>
@@ -598,3 +598,4 @@ export default function InformesNegocio() {
     </div>
   )
 }
+

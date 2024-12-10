@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Calendar, DollarSign, UserPlus, BarChart2, FileText, LogOut, Briefcase, Eye, Clock, CreditCard } from 'lucide-react'
+import { Users, Calendar, DollarSign,  BarChart2, FileText, LogOut, Briefcase, Eye, Clock, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -130,12 +130,6 @@ export default function Dashboard() {
       link: "/gestionclientes"
     },
     {
-      title: "Registro de Clientes",
-      description: "Ver y analizar la base de datos de clientes.",
-      icon: <UserPlus className="h-8 w-8 text-white" />,
-      link: "/cliente"
-    },
-    {
       title: "Agenda",
       description: "Ver y gestionar citas y tareas.",
       icon: <Calendar className="h-8 w-8 text-white" />,
@@ -168,12 +162,7 @@ export default function Dashboard() {
       icon: <FileText className="h-8 w-8 text-white" />,
       link: "/comision"
     },
-    {
-      title: "Crear usuarios",
-      description: "Crear usuarios dependiendo de su rol",
-      icon: <UserPlus className="h-8 w-8 text-white" />,
-      link: "/dashboard"
-    },
+ 
     {
       title: "Gestión de Servicios",
       description: "Administrar y actualizar los servicios ofrecidos.",

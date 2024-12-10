@@ -7,7 +7,6 @@ import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DollarSign, FileText, User, Check, X, Package, ChevronLeft, ChevronRight, Plus, Minus, Home, PlusCircle, Calendar } from 'lucide-react'
 
-
 type SaleFormData = {
   rut: string
   detalles: {
@@ -227,13 +226,34 @@ export default function RegistrarVenta() {
     }
   }
 
-  const calcularComision = (abono: number, tipoPagoId: number) => {
-    const tipoPagoSeleccionado = tiposPago.find(tipo => tipo.id_tipo_pago === tipoPagoId)
-    if (tipoPagoSeleccionado) {
-      const montoConPorcentajeTipoPago = abono * (1 - tipoPagoSeleccionado.porcentaje / 100)
-      return Math.round(montoConPorcentajeTipoPago * 0.1) // 10% de la comisión después de aplicar el porcentaje del tipo de pago, redondeado
+  const calcularComision = async (abono: number, tipoPagoId: number) => {
+    if (idEmpleado === null) {
+      console.error('ID de empleado no disponible')
+      return 0
     }
-    return 0
+
+    const tipoPagoSeleccionado = tiposPago.find(tipo => tipo.id_tipo_pago === tipoPagoId)
+    if (!tipoPagoSeleccionado) {
+      console.error('Tipo de pago no encontrado')
+      return 0
+    }
+
+    try {
+      const { data: empleadoData, error: empleadoError } = await supabase
+        .from('users')
+        .select('porcent_comision')
+        .eq('id', idEmpleado)
+        .single()
+
+      if (empleadoError) throw empleadoError
+
+      const porcentajeComision = empleadoData?.porcent_comision || 10 // Usa 10% si no está definido
+      const montoConPorcentajeTipoPago = abono * (1 - tipoPagoSeleccionado.porcentaje / 100)
+      return Math.round(montoConPorcentajeTipoPago * (porcentajeComision / 100))
+    } catch (error) {
+      console.error('Error al calcular la comisión:', error)
+      return 0
+    }
   }
 
   const handleAddDetail = () => {
@@ -269,7 +289,7 @@ export default function RegistrarVenta() {
       }, 0);
 
       const tipoPagoId = parseInt(saleFormData.tipoPago)
-      const comisionCalculada = calcularComision(abono, tipoPagoId)
+      const comisionCalculada = await calcularComision(abono, tipoPagoId)
 
       const { data: datosVenta, error: errorVenta } = await supabase.from('ventas').insert({
         client_id: saleFormData.rut,
@@ -416,6 +436,8 @@ export default function RegistrarVenta() {
     const daysInMonth = getDaysInMonth(year, month)
     const firstDay = getFirstDayOfMonth(year, month)
     const days = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${i}`} className="p-2"></div>)
@@ -427,14 +449,18 @@ export default function RegistrarVenta() {
       const isSelected = date.toDateString() === scheduleFormData.fechaServicio.toDateString()
       const scheduledDate = scheduledDates.find(sd => sd.date === dateString)
       const isScheduled = !!scheduledDate
+      const isPastDate = date < today
 
       days.push(
         <button
           key={day}
           onClick={() => handleDateClick(date)}
-          className={`p-2 rounded-full hover:bg-purple-100 transition-colors relative ${
+          disabled={isPastDate}
+          className={`p-2 rounded-full transition-colors relative ${
             isSelected ? 'bg-purple-500 text-white' : ''
-          } ${isScheduled ? 'bg-yellow-100' : ''}`}
+          } ${isScheduled ? 'bg-yellow-100' : ''} ${
+            isPastDate ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-purple-100'
+          }`}
         >
           {day}
           {isScheduled && (
@@ -448,8 +474,13 @@ export default function RegistrarVenta() {
   }
 
   const handleDateClick = (date: Date) => {
-    setScheduleFormData(prev => ({ ...prev, fechaServicio: date }))
-    setShowTimeModal(true)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    if (date >= today) {
+      setScheduleFormData(prev => ({ ...prev, fechaServicio: date }))
+      setShowTimeModal(true)
+    }
   }
 
   const handleTimeSelection = (e: React.FormEvent) => {
@@ -820,7 +851,14 @@ export default function RegistrarVenta() {
                             id="horaInicio"
                             name="horaInicio"
                             value={scheduleFormData.horaInicio}
-                            onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaInicio: e.target.value }))}
+                            onChange={(e) => {
+                              const selectedTime = e.target.value;
+                              if (selectedTime >= '09:00' && selectedTime <= '18:00') {
+                                setScheduleFormData(prev => ({ ...prev, horaInicio: selectedTime }));
+                              }
+                            }}
+                            min="09:00"
+                            max="18:00"
                             required
                             className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500"
                           />
@@ -832,7 +870,14 @@ export default function RegistrarVenta() {
                             id="horaFin"
                             name="horaFin"
                             value={scheduleFormData.horaFin}
-                            onChange={(e) => setScheduleFormData(prev => ({ ...prev, horaFin: e.target.value }))}
+                            onChange={(e) => {
+                              const selectedTime = e.target.value;
+                              if (selectedTime > scheduleFormData.horaInicio && selectedTime <= '18:00') {
+                                setScheduleFormData(prev => ({ ...prev, horaFin: selectedTime }));
+                              }
+                            }}
+                            min={scheduleFormData.horaInicio}
+                            max="18:00"
                             required
                             className="w-full rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500"
                           />
@@ -946,3 +991,4 @@ export default function RegistrarVenta() {
     </div>
   )
 }
+

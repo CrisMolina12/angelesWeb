@@ -24,9 +24,9 @@ function Header() {
       initial={{ opacity: 0, y: -50 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-8 rounded-2xl"
+      className="flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg mb-4 sm:mb-8 rounded-2xl"
     >
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 mb-4 sm:mb-0">
         <Image
           src="/Imagen1.png"
           alt="Logo de Angeles"
@@ -186,7 +186,7 @@ export default function ServicioManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-100 py-6 px-2 sm:py-12 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <Header />
         <motion.div 
@@ -195,8 +195,8 @@ export default function ServicioManagement() {
           transition={{ duration: 0.5 }}
           className="bg-white shadow-2xl rounded-3xl overflow-hidden"
         >
-          <div className="p-6 sm:p-10">
-            <h1 className="text-3xl font-bold text-gray-800 mb-8">Gestión de Servicios</h1>
+          <div className="p-4 sm:p-6 md:p-10">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 sm:mb-8">Gestión de Servicios</h1>
 
             {error && (
               <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -208,45 +208,47 @@ export default function ServicioManagement() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className="bg-white shadow-md rounded-lg overflow-hidden mb-8"
+              className="bg-white shadow-md rounded-lg overflow-hidden mb-6 sm:mb-8"
             >
-              <div className="p-6">
-                <h2 className="text-2xl font-semibold mb-4">Agregar Nuevo Servicio</h2>
+              <div className="p-4 sm:p-6">
+                <h2 className="text-xl sm:text-2xl font-semibold mb-4">Agregar Nuevo Servicio</h2>
                 <form onSubmit={handleAddServicio} className="space-y-4">
-                  <div>
-                    <label htmlFor="name_servicio" className="block text-sm font-medium text-gray-700">
-                      Nombre del Servicio
-                    </label>
-                    <input
-                      id="name_servicio"
-                      type="text"
-                      placeholder="Ej: Masaje relajante"
-                      value={newServicio.name_servicio}
-                      onChange={(e) => setNewServicio({ ...newServicio, name_servicio: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="cant_sesiones" className="block text-sm font-medium text-gray-700">
-                      Cantidad de Sesiones
-                    </label>
-                    <input
-                      id="cant_sesiones"
-                      type="number"
-                      placeholder="Ej: 1"
-                      value={newServicio.cant_sesiones}
-                      onChange={(e) => setNewServicio({ ...newServicio, cant_sesiones: parseInt(e.target.value) })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                      min="1"
-                      required
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="name_servicio" className="block text-sm font-medium text-gray-700 mb-1">
+                        Nombre del Servicio
+                      </label>
+                      <input
+                        id="name_servicio"
+                        type="text"
+                        placeholder="Ej: Masaje relajante"
+                        value={newServicio.name_servicio}
+                        onChange={(e) => setNewServicio({ ...newServicio, name_servicio: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="cant_sesiones" className="block text-sm font-medium text-gray-700 mb-1">
+                        Cantidad de Sesiones
+                      </label>
+                      <input
+                        id="cant_sesiones"
+                        type="number"
+                        placeholder="Ej: 1"
+                        value={newServicio.cant_sesiones}
+                        onChange={(e) => setNewServicio({ ...newServicio, cant_sesiones: parseInt(e.target.value) })}
+                        className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                        min="1"
+                        required
+                      />
+                    </div>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                    className="w-full sm:w-auto inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                   >
                     <Plus className="h-5 w-5 mr-2" />
                     Agregar Servicio
@@ -261,7 +263,7 @@ export default function ServicioManagement() {
                 placeholder="Buscar Servicio..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
               />
             </div>
 
@@ -279,53 +281,53 @@ export default function ServicioManagement() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="bg-white shadow-md rounded-lg overflow-hidden"
+                className="bg-white shadow-md rounded-lg overflow-x-auto"
               >
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Servicio</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad de Sesiones</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Nombre del Servicio</th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Cantidad de Sesiones</th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Estado</th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredServicios.map((servicio) => (
                       <tr key={servicio.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-4 whitespace-nowrap text-sm sm:px-6">
                           {editingId === servicio.id ? (
                             <input
                               type="text"
                               value={editingServicio?.name_servicio || ''}
                               onChange={(e) => setEditingServicio({ ...editingServicio!, name_servicio: e.target.value })}
-                              className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              className="w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
                             />
                           ) : (
                             servicio.name_servicio
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-4 whitespace-nowrap text-sm sm:px-6">
                           {editingId === servicio.id ? (
                             <input
                               type="number"
                               value={editingServicio?.cant_sesiones || 0}
                               onChange={(e) => setEditingServicio({ ...editingServicio!, cant_sesiones: parseInt(e.target.value) })}
-                              className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              className="w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
                               min="1"
                             />
                           ) : (
                             servicio.cant_sesiones
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-4 whitespace-nowrap text-sm sm:px-6">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             servicio.estado_servicio.estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
                             {servicio.estado_servicio.estado}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium sm:px-6">
                           {editingId === servicio.id ? (
                             <>
                               <motion.button
@@ -357,9 +359,9 @@ export default function ServicioManagement() {
                                   setEditingId(servicio.id)
                                   setEditingServicio(servicio)
                                 }}
-                                className="text-purple-600  hover:text-purple-900 mr-4"
+                                className="text-purple-600 hover:text-purple-900 mr-2 sm:mr-4"
                               >
-                                <Edit className="h-5 w-5" />
+                                <Edit className="h-4 w-4 sm:h-5 sm:w-5" />
                               </motion.button>
                               <motion.button
                                 whileHover={{ scale: 1.1 }}
@@ -370,9 +372,9 @@ export default function ServicioManagement() {
                                 }`}
                               >
                                 {servicio.estado_servicio.estado === 'Activo' ? (
-                                  <ToggleRight className="h-5 w-5" />
+                                  <ToggleRight className="h-4 w-4 sm:h-5 sm:w-5" />
                                 ) : (
-                                  <ToggleLeft className="h-5 w-5" />
+                                  <ToggleLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                                 )}
                               </motion.button>
                             </>
@@ -390,3 +392,4 @@ export default function ServicioManagement() {
     </div>
   )
 }
+

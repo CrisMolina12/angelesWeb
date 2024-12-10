@@ -3,14 +3,16 @@
 import React, { useState, useEffect, useCallback } from "react"
 import supabase from "../../../lib/supabaseClient"
 import { motion, AnimatePresence } from "framer-motion"
-import { Edit2, X, Check, Search, Filter, Home } from 'lucide-react'
+import { Edit2, X, Check, Search, Filter, Home, UserPlus } from 'lucide-react'
 import Image from 'next/image'
 import Link from "next/link"
+
 interface Trabajador {
   id: number
   name: string | null
   email: string | null
   role: string | null
+  porcent_comision: number | null
 }
 
 function Header() {
@@ -39,7 +41,7 @@ function Header() {
         </motion.span>
       </div>
       <div className="flex items-center space-x-4">
-      <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
+        <Link href="/jefe" className="text-white hover:text-gray-200 transition-colors flex items-center space-x-2">
           <Home size={24} />
           <span className="hidden sm:inline">Volver al Menú</span>
         </Link>
@@ -121,7 +123,6 @@ export default function AdminTrabajadores() {
     setEditableTrabajador(trabajador)
   }
 
-
   const handleUpdate = async (updatedTrabajador: Trabajador) => {
     try {
       const { error } = await supabase
@@ -130,6 +131,7 @@ export default function AdminTrabajadores() {
           name: updatedTrabajador.name,
           email: updatedTrabajador.email,
           role: updatedTrabajador.role,
+          porcent_comision: updatedTrabajador.porcent_comision,
         })
         .eq("id", updatedTrabajador.id)
 
@@ -211,6 +213,18 @@ export default function AdminTrabajadores() {
               </motion.button>
             </div>
 
+            <div className="flex justify-end mb-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition duration-300 shadow-sm text-sm flex items-center"
+                onClick={() => window.location.href = '/dashboard'}
+              >
+                <UserPlus size={16} className="mr-1" />
+                <span>Crear Usuario/Trabajador</span>
+              </motion.button>
+            </div>
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -223,6 +237,7 @@ export default function AdminTrabajadores() {
                       <h2 className="text-lg font-bold">{trabajador.name}</h2>
                       <p className="text-sm text-gray-600">{trabajador.email}</p>
                       <p className="text-sm text-gray-500">Rol: {trabajador.role}</p>
+                      <p className="text-sm text-gray-500">Comisión: {trabajador.porcent_comision !== null ? `${trabajador.porcent_comision}%` : 'No asignada'}</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <motion.button 
@@ -272,6 +287,16 @@ export default function AdminTrabajadores() {
                       placeholder="Correo Electrónico"
                       className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
+                    <input
+                      type="number"
+                      value={editableTrabajador.porcent_comision || ''}
+                      onChange={(e) => setEditableTrabajador({ ...editableTrabajador, porcent_comision: parseFloat(e.target.value) || null })}
+                      placeholder="Porcentaje de Comisión"
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                    />
                     <select
                       value={editableTrabajador.role || ''}
                       onChange={(e) => setEditableTrabajador({ ...editableTrabajador, role: e.target.value })}
@@ -310,3 +335,4 @@ export default function AdminTrabajadores() {
     </div>
   )
 }
+

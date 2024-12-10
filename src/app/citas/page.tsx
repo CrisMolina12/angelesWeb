@@ -19,6 +19,8 @@ interface SupabaseResponse {
   servicios: { name_servicio: string } | null
   detalle_venta: { cant_sesiones: number }[]
   citas: { id: number }[]
+  id_estado_venta: number
+  description: string | null
 }
 
 interface Sale {
@@ -28,6 +30,8 @@ interface Sale {
   fecha_transaccion: string
   cant_sesiones: number
   appointment_count: number
+  id_estado_venta: number
+  description: string
 }
 
 interface Appointment {
@@ -74,8 +78,11 @@ export default function AssignAppointments() {
           clients (name),
           servicios (name_servicio),
           detalle_venta (cant_sesiones),
-          citas (id)
+          citas (id),
+          id_estado_venta,
+          description
         `)
+        .eq('id_estado_venta', 1)
         .order('fecha_transaccion', { ascending: false })
 
       if (error) {
@@ -96,7 +103,9 @@ export default function AssignAppointments() {
         service_name: sale.servicios?.name_servicio || 'Servicio desconocido',
         fecha_transaccion: sale.fecha_transaccion || 'Fecha desconocida',
         cant_sesiones: sale.detalle_venta[0]?.cant_sesiones || 1,
-        appointment_count: sale.citas?.length || 0
+        appointment_count: sale.citas?.length || 0,
+        id_estado_venta: sale.id_estado_venta,
+        description: sale.description || 'Sin descripción',
       }))
 
       console.log('Formatted sales:', formattedSales)
@@ -379,12 +388,13 @@ export default function AssignAppointments() {
                         }`}
                         onClick={() => handleSelectSale(sale)}
                       >
-                        <p className="font-semibold text-lg">{sale.client_name}</p>
+                        <p className="font-semibold text-lg">ID: {sale.id} - {sale.client_name}</p>
                         <p className="text-sm text-gray-600">{sale.service_name}</p>
-                        <p className="text-sm text-gray-500">{moment(sale.fecha_transaccion).format('LL')}</p>
+                        
                         <p className="text-sm text-purple-600 mt-2 font-medium">
                           Sesiones: {sale.appointment_count}/{sale.cant_sesiones}
                         </p>
+                        <p className="text-sm text-gray-600">Descripción: {sale.description}</p>
                       </motion.div>
                     ))}
                   </div>
@@ -408,12 +418,16 @@ export default function AssignAppointments() {
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h2 className="text-xl font-semibold mb-4">Citas</h2>
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold">Detalles de Venta ID: {selectedSale?.id}</h2>
+                    <p className="text-sm text-gray-600">Descripción: {selectedSale?.description}</p>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-4">Citas Asociadas</h3>
                   {selectedSale ? (
                     <>
                       <div className="flex justify-between items-center mb-4">
                         <p className="font-semibold">
-                          Progreso: {selectedSale.appointment_count}/{selectedSale.cant_sesiones} sesiones
+                          Progreso: {appointments.length}/{selectedSale.cant_sesiones} sesiones
                         </p>
                         {editingSessions ? (
                           <div className="flex items-center">
@@ -559,3 +573,4 @@ export default function AssignAppointments() {
     </div>
   )
 }
+

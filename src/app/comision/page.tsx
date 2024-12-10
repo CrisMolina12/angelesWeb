@@ -25,9 +25,8 @@ type Comision = {
 
 type Venta = {
   id_venta: number
-  fecha_venta: string
-  comisiones: Comision[]
   abonos: AbonoDetalle[]
+  comisiones: Comision[]
 }
 
 type User = {
@@ -43,7 +42,6 @@ type UserCommissionTotal = {
 
 type VentaData = {
   id: number
-  fecha_transaccion: string
   comision: {
     id_comision: number
     monto_comision: number
@@ -91,6 +89,20 @@ function Header() {
   )
 }
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+  return localDate.toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC'
+  });
+};
+
 export default function ComisionesTable() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [filteredVentas, setFilteredVentas] = useState<Venta[]>([])
@@ -131,7 +143,6 @@ export default function ComisionesTable() {
         .from('ventas')
         .select(`
           id,
-          fecha_transaccion,
           comision (
             id_comision,
             monto_comision,
@@ -145,7 +156,7 @@ export default function ComisionesTable() {
             id_tipo_pago
           )
         `)
-        .order('fecha_transaccion', { ascending: false })
+        .order('id', { ascending: false })
 
       if (ventasError) throw ventasError
 
@@ -153,15 +164,14 @@ export default function ComisionesTable() {
         console.log('Datos de ventas recibidos:', ventasData)
         const processedVentas: Venta[] = (ventasData as unknown as VentaData[]).map((venta) => ({
           id_venta: venta.id,
-          fecha_venta: venta.fecha_transaccion, 
+          abonos: venta.abono,
           comisiones: venta.comision.map((com) => ({
             id_comision: com.id_comision,
             monto_comision: com.monto_comision,
             fecha_comision: com.fecha_comision,
             empleado_name: com.empleado.name,
             empleado_id: com.empleado.id
-          })),
-          abonos: venta.abono
+          }))
         }))
 
         setVentas(processedVentas)
@@ -225,10 +235,13 @@ export default function ComisionesTable() {
     }
 
     if (selectedMonth) {
-      filtered = filtered.filter(venta => {
-        const ventaDate = new Date(venta.fecha_venta)
-        return ventaDate.getMonth() === parseInt(selectedMonth) - 1
-      })
+      filtered = filtered.filter(venta => 
+        venta.abonos.some(abono => {
+          const abonoDate = new Date(abono.fecha_abono)
+          return abonoDate.getMonth() === parseInt(selectedMonth) - 1 && 
+                 abonoDate.getFullYear() === new Date().getFullYear()
+        })
+      )
     }
 
     console.log('Ventas filtradas:', filtered)
@@ -289,7 +302,7 @@ export default function ComisionesTable() {
                   {userCommissionTotals.map((total) => (
                     <tr key={`total-${total.empleado_id}`}>
                       <td className="px-6 py-4 text-sm">{total.empleado_name}</td>
-                      <td className="px-6 py-4 text-sm font-semibold">${total.total_comision.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold">${Math.round(total.total_comision)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -343,8 +356,8 @@ export default function ComisionesTable() {
               <table className="min-w-full table-auto">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Fecha de Venta</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">ID Venta</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Fecha de Abono</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Comisiones</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">Abonos</th>
                   </tr>
@@ -356,32 +369,26 @@ export default function ComisionesTable() {
                     </tr>
                   ) : (
                     filteredVentas.map((venta, index) => (
-                      <tr key={`venta-${venta.id_venta || index}`}>
-                        <td className="px-6 py-4 text-sm">
-                          {venta.fecha_venta 
-                            ? new Date(venta.fecha_venta).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                              }) 
-                            : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-sm">{venta.id_venta || 'N/A'}</td>
-                        <td className="px-6 py-4 text-sm">
-                          {venta.comisiones.map((comision, comIndex) => (
-                            <div key={`comision-${venta.id_venta || index}-${comision.id_comision || comIndex}`} className={comIndex > 0 ? 'mt-2' : ''}>
-                              {comision.empleado_name}: ${comision.monto_comision.toFixed(2)}
+                      <tr key={`venta-${venta.id_venta || index}`} className="border-b border-gray-200">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{venta.id_venta || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {venta.abonos.map((abono, abonoIndex) => (
+                            <div key={`abono-date-${venta.id_venta || index}-${abono.id || abonoIndex}`} className={abonoIndex > 0 ? 'mt-2' : ''}>
+                              {formatDate(abono.fecha_abono)}
                             </div>
                           ))}
                         </td>
-                        <td className="px-6 py-4 text-sm">
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {venta.comisiones.map((comision, comIndex) => (
+                            <div key={`comision-${venta.id_venta || index}-${comision.id_comision || comIndex}`} className={comIndex > 0 ? 'mt-2' : ''}>
+                              {comision.empleado_name}: ${Math.round(comision.monto_comision)}
+                            </div>
+                          ))}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
                           {venta.abonos.map((abono, abonoIndex) => (
                             <div key={`abono-${venta.id_venta || index}-${abono.id || abonoIndex}`} className={abonoIndex > 0 ? 'mt-2' : ''}>
-                              ${abono.cantidad_abonada.toFixed(2)} - {new Date(abono.fecha_abono).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                              })} - {abono.id_tipo_pago}
+                              ${Math.round(abono.cantidad_abonada)} - {formatDate(abono.fecha_abono)} - {abono.id_tipo_pago}
                             </div>
                           ))}
                         </td>
@@ -397,3 +404,4 @@ export default function ComisionesTable() {
     </div>
   )
 }
+
