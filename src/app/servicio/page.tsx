@@ -1,12 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import Image from 'next/image'
-import supabase from '../../../lib/supabaseClient'
-import { Plus, Edit, X, Check, ToggleLeft, ToggleRight, Home } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import supabase from "../../../lib/supabaseClient"
+import { motion } from 'framer-motion'
+import { Plus, Edit, X, Check, ToggleLeft, ToggleRight, Home,  } from 'lucide-react'
 
 interface Servicio {
   id: number
@@ -16,6 +16,7 @@ interface Servicio {
   estado_servicio: {
     estado: 'Activo' | 'Inactivo'
   }
+  precio_servicio: number | null
 }
 
 function Header() {
@@ -60,6 +61,7 @@ export default function ServicioManagement() {
     name_servicio: '',
     cant_sesiones: 1,
     estado_servicio_id: 1,
+    precio_servicio: null
   })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingServicio, setEditingServicio] = useState<Servicio | null>(null)
@@ -118,6 +120,10 @@ export default function ServicioManagement() {
 
   const handleAddServicio = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!newServicio.name_servicio || newServicio.cant_sesiones < 1 || newServicio.precio_servicio === null) {
+      setError('Por favor, complete todos los campos correctamente.')
+      return
+    }
     try {
       const { error } = await supabase
         .from('servicios')
@@ -125,7 +131,8 @@ export default function ServicioManagement() {
 
       if (error) throw error
       await fetchServicios()
-      setNewServicio({ name_servicio: '', cant_sesiones: 1, estado_servicio_id: 1 })
+      setNewServicio({ name_servicio: '', cant_sesiones: 1, estado_servicio_id: 1, precio_servicio: null })
+      setError(null)
     } catch (error) {
       console.error('Error adding servicio:', error)
       setError('Failed to add servicio. Please check your input.')
@@ -140,6 +147,7 @@ export default function ServicioManagement() {
           name_servicio: servicio.name_servicio,
           cant_sesiones: servicio.cant_sesiones,
           estado_servicio_id: servicio.estado_servicio_id,
+          precio_servicio: servicio.precio_servicio
         })
         .eq('id', servicio.id)
 
@@ -243,6 +251,22 @@ export default function ServicioManagement() {
                         required
                       />
                     </div>
+                    <div>
+                      <label htmlFor="precio_servicio" className="block text-sm font-medium text-gray-700 mb-1">
+                        Precio del Servicio
+                      </label>
+                      <input
+                        id="precio_servicio"
+                        type="number"
+                        placeholder="Ej: 50000"
+                        value={newServicio.precio_servicio ?? ''}
+                        onChange={(e) => setNewServicio({ ...newServicio, precio_servicio: e.target.value ? parseFloat(e.target.value) : null })}
+                        className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                        min="0"
+                        step="1000"
+                        required
+                      />
+                    </div>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -289,6 +313,7 @@ export default function ServicioManagement() {
                       <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Nombre del Servicio</th>
                       <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Cantidad de Sesiones</th>
                       <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Estado</th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Precio</th>
                       <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6">Acciones</th>
                     </tr>
                   </thead>
@@ -326,6 +351,20 @@ export default function ServicioManagement() {
                           }`}>
                             {servicio.estado_servicio.estado}
                           </span>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm sm:px-6">
+                          {editingId === servicio.id ? (
+                            <input
+                              type="number"
+                              value={editingServicio?.precio_servicio ?? ''}
+                              onChange={(e) => setEditingServicio({ ...editingServicio!, precio_servicio: e.target.value ? parseFloat(e.target.value) : null })}
+                              className="w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              min="0"
+                              step="1000"
+                            />
+                          ) : (
+                            `$${servicio.precio_servicio != null ? servicio.precio_servicio.toLocaleString('es-CL') : 'No disponible'}`
+                          )}
                         </td>
                         <td className="px-3 py-4 whitespace-nowrap text-sm font-medium sm:px-6">
                           {editingId === servicio.id ? (
